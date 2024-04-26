@@ -12,7 +12,7 @@ grogra.de/software/groimp/index.html> or <https://gitlab.com/grogra/groimp>
 
 To be able run the model, please contact us for additional installation instructions.
 
-For Post-Processing you will need recent versions of `R` (>v.4.3) and `RStudio` (reccomended, >v.2023.12.1 Build 402).
+For Post-Processing you will need recent versions of `R` (>v.4.3) and `RStudio` (recommended, >v.2023.12.1 Build 402).
 
 
 ### Cloning the Repository
@@ -25,21 +25,22 @@ Extract the folders in `ViRi_Input/Cluster_Folders.zip` into `ViRi_Input` to fil
 
 ## Running the Model
 
-Open GroIMP.
-Navigate to File > Open.
-Select the ViRi.gs file in the folder ViRi_dev.
-Follow the more detailed example instructions below.
+- Open `GroIMP`  
+- Navigate to `File > Open`    
+- Select the `ViRi.gs` file in the folder `ViRi_dev`    
+- Follow the more detailed example instructions below   
 
 
 ## Contact
-For any futher queries or issues related to the model, please contact us   
+
+For any futher queries or issues related to the model, please contact us:   
 dominik.schmidt@hs-gm.de (primary contact)  
 katrin.kahlen@hs-gm.de  
 christopher.bahr@hs-gm.de  
 
 
 
-# Related publications
+## Related publications
 
 - Schmidt, D., Bahr, C., Friedel, M., and Kahlen, K., Modelling Approach for Predicting the Impact of Changing Temperature Conditions on Grapevine Canopy Architectures. Agronomy, 9, 426, 2019. https://doi.org/10.3390/agronomy9080426
 - Bahr, C., Schmidt, D., Friedel, M., and Kahlen, K., Leaf removal effects on light absorption in virtual Riesling canopies (*Vitis vinifera*), *in silico Plants*, Volume 3, Issue 2, diab027, 2021. https://doi.org/10.1093/insilicoplants/diab027  
@@ -48,23 +49,23 @@ christopher.bahr@hs-gm.de
 
 
 
-# Funding
+## Funding
 
 The model development has been partialy funded by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation), project numbers 449374897 and 432888308.
 
 
 ---
 
-# Manual example simulation setup
+## Manual example simulation setup
 
 
-## Simulation
+### Simulation
 
-### 1. Open GroImp 
+#### 1. Open GroImp 
 
-### 2. Open `ViRi.gs` File in `ViRi_dev`
+#### 2. Open `ViRi.gs` File in `ViRi_dev`
 
-### 3. Set paths in `Globals.rgg`
+#### 3. Set paths in `Globals.rgg`
 
 	static final String inputPath = 
 	"/full/path/to/ViRi_Input/";
@@ -73,7 +74,7 @@ The model development has been partialy funded by the Deutsche Forschungsgemeins
 	"/full/path/to/ViRi_Output/";
 
 
-### 4. Change 3 lines of code in `main_develop.rgg`
+#### 4. Change 3 lines of code in `main_develop.rgg`
 
 to:
 
@@ -87,13 +88,14 @@ to:
 ... save these changes to disable visualiztaion during simulation
 
 
-### 5. Press button `loopSim`
+#### 5. Press button `loopSim`
+
+---
+
+### Post-Processing
 
 
-## Post-Processing
-
-
-### 1. `ViRi_Output`
+#### 1. `ViRi_Output`
 
 - Simulation produces 5 files in ViRi_Output    
 - Sunburn Post-Processing relies on:  
@@ -101,7 +103,7 @@ to:
 	- `Leaves_Minutes_`  
 
 
-### 2. Go to folder `ViRi_Post_Processing`
+#### 2. Go to folder `ViRi_Post_Processing`
 
 - launch `data_processing.Rproj` to get to `RStudio`   
 - run script `process_ViRi_output.R`  
@@ -115,14 +117,13 @@ w/o `RStudio`
 
 
 
-## Optional settings to change scenario in
+### Optional settings to change scenario in `main_develop.rgg`
 
-ViRi_Geisenheim/main_develop.rgg:
+- rowOrientation: activate scene view (enableView3DRepaint(); and const boolean transOn = false;) and compass (const boolean compass = true;) to see orientation and cane growth direction  
+- defoliateOnSide: left=left side of cane growth direction; right=right side of cane growth direction  
+- defoliateAbove: leaf removal above z (height above ground)  
+- defoliateBelow: leaf removal below z (height above ground)  
 
-rowOrientation: activate scene view (enableView3DRepaint(); and const boolean transOn = false;) and compass (const boolean compass = true;) to see orientation and cane growth direction
-defoliateOnSide: left=left side of cane growth direction; right=right side of cane growth direction
-defoliateAbove: leaf removal above z (height above ground)
-defoliateBelow: leaf removal below z (height above ground)
  
 
 
