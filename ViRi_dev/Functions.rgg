@@ -1,0 +1,238 @@
+
+
+import static modules_plant.*;
+import static Globals.*; // use methods in Riesling
+import java.util.Random; // use java random functions (min, max)
+
+// FUNCTIONS
+
+// sample random float from interval (uniform)
+// to use same random generator in Lpy
+public static float RandomMinMax(float min, float max, Random r)
+{
+	float random = min + r.nextFloat() * (max - min);
+	return(random);
+}
+
+// Bud Burst on cane 
+// mean day +/- days, which are determined with sum of thermal time looking 
+// forward and backwards in time (THT function: switch start and end to go 
+// forward and backwards (doy, budBurst)
+// pars[33] = sd
+public static int BudBurst(int mean, String[][] weather, 
+float base)
+{
+	float distr = normal(0, pars[33]);
+	//println("distr: " + distr);
+	int day = 0;
+	if(distr < 0){
+		int count = 0;
+		// subtract one to exclude the mean
+		for(int row = mean - 1; row >= 0; row--){ // change "mean" to "start"
+			//count++;
+			//println("count: " + count);
+			// subtract one to sum up backwards excluding the day of mean 
+			float sumTHTNecessary = THTCane(weather, base, mean - 1, row);		
+			//println("sumTHTNecessary: " + sumTHTNecessary);
+			if(sumTHTNecessary > Math.abs(distr))
+			{
+				day = row;
+				break;
+			}
+		}
+	}
+	else {
+		
+		for(int row = mean; row <= weather.length-1; row++){
+			if(THTCane(weather, base, row, mean) > distr)
+			{
+				day = row;
+				break;
+			}
+		}
+	}
+	return(day);
+}
+
+// primary internode elongation
+// /100 = cm into meter // TBD: change parameters
+// pars[10] = lrc, pars[11] = Int, pars[12] = m, pars[13] = a, pars[14] = b
+public static float primIntGrowth(float tht, int rank)
+{
+		float asym;
+		if(rank <= 7){
+				asym = (pars[12] * rank) + pars[11];
+		}
+		else{
+				asym = ((rank + 1) % 3) * pars[13] + pars[14];
+		}
+		
+		return((asym * (1 - Math.exp(- Math.exp(pars[10]) * tht))) / 100);
+}
+
+// secondary internode elongation
+// /100 = cm into meter // TBD: change parameters
+// pars[15] = lrc, pars[16] = max, pars[17] = R_0, pars[18] = lrcAsym
+public static float SecIntGrowth(float tht, int rank)
+{
+	    float asym = 
+	    pars[16] + (pars[17] - pars[16]) * Math.exp(- Math.exp(pars[18]) 
+	    * rank);
+		return(asym * (1 - Math.exp(- Math.exp(pars[15]) * tht)) / 100);
+}
+
+//primary leaf growth
+// /100 = cm into meter // TBD: change parameters
+// pars[20] = lrc, pars[21] = max, pars[22] = R_0, pars[23] = lrcAsym
+// returns SL (sum of veins)
+public static float PrimLeafGrowth(float tht, int rank)
+{
+	    float asym = 
+	    pars[21] + (pars[22] - pars[21]) * Math.exp(- Math.exp(pars[23]) 
+	    * rank);
+		return(asym * (1 - Math.exp(- Math.exp(pars[20]) * tht)) / 100);
+}
+
+// secondary leaf growth
+// /100 = cm into meter // TBD: change parameters
+// pars[24] = asym, pars[25] = lrc
+// retruns SL (sum of veins)
+public static float SecLeafGrowth(float tht, int rank)
+{
+		return(pars[24] * (1 - Math.exp(- Math.exp(pars[25]) * tht)) / 100);
+}
+
+// total THT
+public static float THT(String[][] data, float base, int doy, int budBurst)
+{
+	float maintainTotal = 0;
+	for(int row = budBurst; row < doy; row++){ //budBurst - 1; row <= doy - 1
+		maintainTotal += Math.max(0, 0.5 * 
+		(Float.parseFloat(data[row][2]) + 
+		Float.parseFloat(data[row][3])) - base); 
+	}
+	return(maintainTotal);
+}
+
+// total THTCane (includes mean)
+// input: on pos. 3 input==budBurst, pos. 4 input == doy, hence this must be changed for readability!
+public static float THTCane(String[][] data, float base, int doy, int budBurst)
+{
+	float maintainTotal = 0;
+	for(int row = budBurst - 1; row <= doy - 1; row++){ 
+		maintainTotal += Math.max(0, 0.5 * 
+		(Float.parseFloat(data[row][2]) + 
+		Float.parseFloat(data[row][3])) - base); 
+	}
+	return(maintainTotal);
+}
+
+// secondary shoot appearance depends on rank and necessary ThT
+// OUT!!! pars[6] = Intercept, pars[7] = a, pars[8] = b, pars[9] = sd
+// pars[43] = Intercept , pars[44] = a, pars[45] = THTmin, pars[46] = sd
+public static float SecShootAppTHT(int rank)
+{
+	//return(normal(pars[6] + pars[7] * rank + pars[8] * rank**2, pars[9]));
+	//return(Math.max(pars[45], normal(pars[43] + pars[44] * rank, pars[46])));
+	return(Math.max(pars[45], normal(Math.max(pars[45],pars[43] + pars[44] * rank), pars[46])));
+}
+
+// secondary shoot appearance probability depends on rank
+// pars[3] = asym, pars[4] = R_0, pars[5] = lrc
+public static float SecShootAppProb(int rank)
+{
+	if(rank == 1 || rank == 2){return(0);}
+	else{
+		return(pars[3] + (pars[4] - pars[3]) * Math.exp(- Math.exp(pars[5])
+		* rank));
+	}
+}
+
+// petiole elongation (both orders, parameter passed in Riesling.rgg
+// /100 = cm into meter // TBD: change parameters
+// /pars[19] to take out the transformation factor for coordinates
+public static float PetGrowth(float scale, float a, float b)
+{
+	return((a * (scale / pars[19] * 100) + b * (scale / pars[19] * 100)**2) 
+	/ 100);
+}
+
+// petiole midrib angle (angle located at the base of the leaf)
+// /pars[19] to take out the transformation factor for coordinates
+// pars[38] = l, pars[39] = c1, pars[40] = c2, pars[41] = c3
+public static float MidribAngle(float scale, int rank)
+{
+	return(pars[38] + pars[39] * (scale / pars[19] * 100) + pars[40] * rank +
+	pars[41] * (scale / pars[19] * 100) * rank);	
+}
+
+// compute average height of all shoots
+// !! not working anymore after pruning
+static float meanHeightOfPrimaryShoots()
+[
+	{ 
+		float sumOfHeights = 0;
+		long countPrimaryShoots = 
+		count((* i:Internode, (i[order] == 1 && i[rank] == 1) *));
+		if(countPrimaryShoots>0) {
+			sumOfHeights = sum((* a:Apex, (a[order] == 1) *).z);
+			return(sumOfHeights/countPrimaryShoots);
+		}
+	}
+]
+
+// Longwave Radiation
+
+static float getAmbientLongwaveFlux(float temperature, float humidity){
+   temperature += 273.15;
+   //Model from Prata (1996) Q. J. R. Meteorol. Soc.
+  
+   float e0 = 611.f*Math.exp(17.502f*(temperature-273.15)/((temperature-273.15)+240.9f))*humidity; //Pascals
+  
+   float K = 0.465f; //cm-K/Pa
+  
+   float xi = e0/temperature*K;
+   float eps = 1.f-(1.f+xi)*Math.exp(-Math.sqrt(1.2f+3.f*xi));
+  
+   return(eps*5.67e-8*Math.pow(temperature,4));
+  
+}
+
+static float getSkyEmissivity(float temperature, float humidity){
+   temperature += 273.15;
+   //Model from Prata (1996) Q. J. R. Meteorol. Soc.
+  
+   float e0 = 611.f*Math.exp(17.502f*(temperature-273.15)/((temperature-273.15)+240.9f))*humidity; //Pascals
+  
+   float K = 0.465f; //cm-K/Pa
+  
+   float xi = e0/temperature*K;
+   float eps = 1.f-(1.f+xi)*Math.exp(-Math.sqrt(1.2f+3.f*xi));
+  
+   return(eps);
+  
+}
+
+static float getGroundLongwaveFlux(float temperature, float eps){
+  
+	temperature += 273.15;
+	// Ponce de Leon 2021 eps= 0.95
+   return(eps*5.67e-8*Math.pow(temperature,4));
+  
+}
+
+public static float powerSineCorrection(float power) {
+	return(power/72.0/0.202787 + power/72.0/0.562083 + power/72.0/0.818145 + power/72.0/0.946085 + power/72.0/0.992115 +  power/72.0/0.999877);
+}
+		
+public static float powerSineCorrection2(float power) {
+	return(power*0.003218/Math.sin(11.7*Math.PI/180.0)
+	+ power*0.01163/Math.sin(34.2*Math.PI/180.0)
+	+ power*0.019812/Math.sin(54.9*Math.PI/180.0)
+	+ power*0.023022/Math.sin(71.1*Math.PI/180.0)
+	+ power*0.018522/Math.sin(82.8*Math.PI/180.0)
+	+ power*0.007096/Math.sin(89.1*Math.PI/180.0));
+}
+	
+
+

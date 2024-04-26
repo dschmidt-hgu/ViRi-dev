@@ -1,0 +1,471 @@
+
+
+import de.grogra.xl.util.IntList; // for module Leaf
+import de.grogra.xl.util.FloatList; // for module Leaf
+
+import static main_Develop.*;
+import static Light.*;
+import static Functions.*;
+import static Globals.*;
+import static input_output.*;
+//import static methods_simulation.*;
+//import static Methods.*;
+import static methods_plant.*;
+import static modules_light.*;
+                                              
+//import de.grogra.ray.physics.Spectrum;
+import de.grogra.ray.physics.Spectrum3d;
+
+
+abstract module Organ(super.length) extends M(length) {
+	int plantNumber;
+	int order;
+	int rank;
+	int dayOfDevelopment;
+	int rankOnCane;
+	int rankOnParentShoot;
+	int dayOfShootDevelopment;
+	int rowNumber;
+	float necessaryTHTforDevelopment;
+	int rankOfParentInternode;
+	float x=0,y=0,z=0;
+	int clusterFate;
+	boolean withCluster;
+		
+	void setDayOfShootDevelopment(int doy) {
+		dayOfShootDevelopment = doy;
+	}
+	
+	void computeDimensions();
+}
+
+module WinterBud extends Organ {
+	void initiate(int order_v, int rank_v, int dayOfShootDevelopment_v, int rankOnCane_v, int rowNumber_v, int plantNumber_v) { //, int v_clusterFate
+		plantNumber = plantNumber_v;
+		order = order_v;
+		rank = rank_v;
+		//dayOfDevelopment = dayOfYear;
+		dayOfShootDevelopment = dayOfShootDevelopment_v;
+		rankOnCane = rankOnCane_v;
+		rankOnParentShoot = rankOnCane_v;
+		rowNumber = rowNumber_v;
+		length = 0;
+		//clusterFate = v_clusterFate;
+	}
+}
+//==> Sphere(0.001).(setShader(new RGBAShader(0, 0, 0, 0)));
+//==> Sphere(.015).(setShader(RED)); //0.005
+
+
+module Internode extends Organ
+{
+	float diameter;
+	
+	void initiate(Organ o) { 
+		length = 0.000001;//length;
+		diameter = 0.002;// diameter;
+		plantNumber = o.plantNumber;
+		order = o.order;
+		rank = o.rank + 1;
+		dayOfDevelopment = dayOfYear;
+		rankOnCane = o.rankOnCane;
+		rankOnParentShoot = o.rankOnParentShoot;
+		rowNumber = o.rowNumber;
+	}
+	
+	void computeDimensions() {
+		if(order == 1){
+		// SD missing
+		length = primIntGrowth(THT(weatherData, 10, dayOfYear, dayOfDevelopment), rank);
+		diameter += 0.0002;
+		}
+		if(order == 2){
+			// SD missing
+			length = SecIntGrowth(THT(weatherData, 10, dayOfYear, dayOfDevelopment), rank);
+			diameter += 0.00015;
+		}
+	}
+}
+==> F(length, diameter).(setShader(transOn?new RGBAShader(0, 0, 0, 0):new RGBAShader(0, 0.5, 0, 1))); 
+//==> F(length, diameter).(setShader(RED)); 
+
+module Apex extends Organ {	
+	void initiate(Organ o) {
+		plantNumber = o.plantNumber;
+		order = o.order;
+		rank = o.rank + 1;
+		dayOfDevelopment = dayOfYear;
+		rankOnCane = o.rankOnCane;
+		rankOnParentShoot = o.rankOnParentShoot;
+		dayOfShootDevelopment = o.dayOfShootDevelopment;
+		rowNumber = o.rowNumber;
+		length = 0;
+		clusterFate = o.clusterFate;
+	}
+}
+// if draw on, transparent switch
+//==> Sphere(0.005).(setShader(new RGBAShader(1, 0, 0, 0)));
+//==> Sphere(0.01).(setShader(RED));//0.05
+
+module AxillaryBud extends Organ {
+	//float necessaryTHTforDevelopment;
+	//int rankOfParentInternode;
+		
+	void initiate(Organ o) {
+		plantNumber = o.plantNumber;
+		order = o.order + 1;
+		rank = 0; // ok?
+		dayOfDevelopment = dayOfYear;
+		//dayOfShootDevelopment = dayOfYear; // sets value to doy of initiation
+		necessaryTHTforDevelopment = SecShootAppTHT(o.rank + 1);
+		rankOfParentInternode = o.rank + 1;
+		rankOnCane = o.rankOnCane;
+		rankOnParentShoot = o.rank + 1;
+		rowNumber = o.rowNumber;
+		length = 0;
+	}
+	/*
+	void setDayOfShootDevelopment(int doy) {
+		dayOfShootDevelopment = doy;
+	}*/
+}
+// if draw on, transparent switch
+//==> Sphere(0.005).(setShader(new RGBAShader(0, 0, 0, 0)));
+//==> Sphere(0.005).(setShader(RED));
+
+module FruitMeristem extends Organ {
+	//float necessaryTHTforDevelopment;
+	//int rankOfParentInternode;
+		
+	void initiate(Organ o) {
+		plantNumber = o.plantNumber;
+		order = o.order;
+		rank = o.rank + 1;
+		dayOfDevelopment = dayOfYear;
+		//dayOfShootDevelopment = dayOfYear; // sets value to doy of initiation
+		//necessaryTHTforDevelopment = SecShootAppTHT(o.rank + 1);
+		rankOfParentInternode = o.rank + 1;
+		rankOnCane = o.rankOnCane;
+		rankOnParentShoot = o.rank + 1;
+		rowNumber = o.rowNumber;
+		clusterFate = o.clusterFate;
+		withCluster;
+	}
+	void determineClusterFate(Organ o) {
+		if(o.clusterFate == 3) {
+			if(this.rank == 3 || this.rank == 4 || this.rank == 6) {
+				withCluster = true;
+			}
+		}
+		if(o.clusterFate == 4) {
+			if(this.rank == 4 || this.rank == 5 || this.rank == 7) {
+				withCluster = true;
+			}
+		}
+	}
+	/*
+	void setDayOfShootDevelopment(int doy) {
+		dayOfShootDevelopment = doy;
+	}*/
+}
+//==> Sphere(0.0075).(setShader(RED));
+
+module Peduncle(super.length) extends F(length, 0.0025).(setShader(transOn?new RGBAShader(0, 0, 0, 0):RED)); //GREEN 
+
+
+module Petiole extends Organ
+{
+	float diameter;
+	int age;
+	
+	void initiate(Organ o, int age_v) { 
+		length = 0.002;//length;
+		diameter = 0.001;// diameter;
+		plantNumber = o.plantNumber;
+		order = o.order;
+		rank = o.rank + 1;
+		dayOfDevelopment = dayOfYear;
+		rankOnCane = o.rankOnCane;
+		rankOnParentShoot = o.rankOnParentShoot;
+		rowNumber = o.rowNumber;
+		age = age_v;
+	}
+	
+	void computeDimensions() 
+	[
+		// this?
+		(* pet:this (-->)+ l:Leaf *) ::>	{
+			if(l.order == 1) {
+				pet.length = PetGrowth(l.scale, pars[26], pars[27]);
+			}
+			
+			if(l[order] == 2) {
+				pet.length = PetGrowth(l.scale, pars[28], pars[29]);
+				}
+		}
+	]
+	
+}
+==> F(length, diameter).(setShader(transOn?new RGBAShader(0, 0, 0, 0):GREEN));
+
+
+module Joint(Point3d vector, super.strength, 
+int number) extends RPGeisenheim(vector, strength) {
+	double x=0,y=0,z=0;
+}
+//==> Sphere(0.01).(setShader(RED));
+
+
+module JMidrib(super.angle) extends RL(angle);
+
+
+// Polygon leaf
+// parameters
+
+// general
+static boolean sRFR				= false;		// toggle PAR or R:FR visualisation (default value for swColor() method)
+
+// parameters
+const Phong LeafLightShader			= new Phong().(setDiffuse(new RGBColor(reflectancePAR,reflectanceNIR,0)), setDiffuseTransparency(new RGBColor(transmittancePAR,transmittanceNIR,0)));
+//const Phong LightOpaqueShader	= new Phong().(setDiffuse(new RGBColor(reflectancePAR+transmittancePAR,reflectanceRed+transmittanceRed,reflectanceFarRed+transmittanceFarRed)), setDiffuseTransparency(new RGBColor(0,0,0)));
+const Phong FullTransparencyShader			= new Phong().(setDiffuse(new RGBColor(0,0,0)), setDiffuseTransparency(new RGBColor(1,1,1)));
+const Phong BerryLightShader			= new Phong().(setDiffuse(new RGBColor(berryReflectancePAR,berryReflectanceNIR,0)), setDiffuseTransparency(new RGBColor(berryTransmittancePAR,berryTransmittanceNIR,0)));
+
+
+
+// parent module for all organs that can absorb light and photosynthesize
+// currently only one organ: Leaf
+module LightAbsorptionOrgan extends Organ
+{
+	// light absorption
+	double abs_fullSpec;			// absorbed full spectrum radiation (W/s)
+	double abs_PAR;					// (W/s)
+	double abs_NIR; 				// (W/s)
+	double abs_fullSpec_m2;			// (W/m²)
+	double abs_PAR_m2;					// absorbed radiation per unit area (W/m²)
+	//double fabs;					// fraction of globRad absorbed
+	double area;
+	double sx;
+	double sy;
+	double sz;
+
+	// calculate light absorption
+ 	void calcLight()
+	{
+		if (area > 0.00001) {
+			Spectrum3d spec;
+			/*
+			if (flux == true) {
+				spec = flm.getAbsorbedPower3d(this);
+			} else {
+				spec = lm.getAbsorbedPower3d(this);
+			}*/
+			spec = lm.getAbsorbedPower3d(this);
+			sx = spec.x;
+			sy = spec.y;
+			sz = spec.z;
+			abs_fullSpec = cm * spec.z; // no reflectance or transmittance
+			abs_PAR = cm * spec.x * fractionPAR;
+			abs_NIR = cm * spec.y * fractionNIR;
+			abs_fullSpec_m2 = abs_fullSpec/area;
+			//println("abs_fullSpec_m2: " + abs_fullSpec_m2);
+			abs_PAR_m2 = abs_PAR/area;
+			//fabs = absm2 / PPFD;
+		} else {
+			abs_fullSpec = 0;
+			abs_PAR = 0;
+			abs_NIR = 0;
+			abs_PAR_m2 = 0;
+			//fabs = absm2 / PPFD;
+		}
+	}
+	
+	void calcArea();
+}
+
+
+// Polygon leaf
+//module leaf extends Box(0.1,0.1,0.1);
+module Leaf() extends LightAbsorptionOrgan {
+	float scale;
+	
+	void initiate(Organ o) { 
+		plantNumber = o.plantNumber;
+		order = o.order;
+		rank = o.rank + 1;
+		dayOfDevelopment = dayOfYear;
+		rankOnCane = o.rankOnCane;
+		rankOnParentShoot = o.rankOnParentShoot;
+		rowNumber = o.rowNumber;
+		scale = 1;//0.01;
+	}
+	/*
+	double scale;
+	//double diameter;
+	
+	void initi()
+	{
+		scale = 50;
+		//length = 20;
+		//diameter = 50;
+	}*/
+	void computeDimensions() {
+		if(order == 1){
+			scale = 
+			pars[19] * 
+			PrimLeafGrowth(THT(weatherData, 10, dayOfYear, dayOfDevelopment), rank);
+		}
+		if(order == 2){
+			scale = pars[19] * 
+			SecLeafGrowth(THT(weatherData, 10, dayOfYear, dayOfDevelopment), rank);
+		}
+		
+		// area in m²
+		area = ((scale)**2); 
+	}
+				
+	/*void calcArea()
+	{
+		// area in m²
+		area = ((scale/pars[19])**2);
+	}*/
+			
+	Shader LeafShader = new RGBAShader(0, 0.5, 0);
+        // coordinates for each triangle (facet) of the triangulated leaf
+        // TBD: read list
+        FloatList vertexData = new FloatList(new float[] {
+        0, 0, 0, -0.112784423061961, 0.562051537565323, 0.180983373709963, 
+        -0.40237709055199, 0.235764383360833, 0.0498973131679368, 0, 0, 0, 
+        -0.0285679527598672, -0.57174752372368, 0.185472280289994, 
+        -0.358351518182525, -0.27829123155991, 0.0880078877971698, 0, 0, 0, 
+        -0.112784423061961, 0.562051537565323, 0.180983373709963,
+        -0.00757012555175539, 0.439897594230419, 0.166064602123384, 0, 0, 0, 
+        0.0547385401214449, -0.435708430124286, 0.151945159340536,
+        -0.0285679527598672, -0.57174752372368, 0.185472280289994, 0, 0, 0,
+        -0.00757012555175539, 0.439897594230419, 0.166064602123384, 
+        0.582282881699195, 0.534250568490738, 0.114861878194508, 0, 0, 0, 
+        0.0547385401214449, -0.435708430124286, 0.151945159340536, 
+        0.626223628844426, -0.47253410278889, 0.0972895323876046, 
+        0.582282881699195, 0.534250568490738, 0.114861878194508,
+        0.16461810757699, 0.610669112775247, 0.179123704369303,
+        -0.00757012555175539, 0.439897594230419, 0.166064602123384, 
+        0.626223628844426, -0.47253410278889, 0.0972895323876046,
+        0.217298127884052, -0.592184805911892, 0.176875046747193,
+        0.0547385401214449, -0.435708430124286, 0.151945159340536, 0, 0, 0, 
+        0.430626666922783, 0.247801246960088, 0.102764173876781, 
+        0.582282881699195, 0.534250568490738, 0.114861878194508, 0, 0, 0, 
+        0.426472982891481, -0.222560387722977, 0.108163302417362,
+        0.626223628844426, -0.47253410278889, 0.0972895323876046, 0, 0, 0, 
+        0.347793592590369, 0.00251112585383129, 0.0574457445617481,
+        0.430626666922783, 0.247801246960088, 0.102764173876781, 0, 0, 0, 
+        0.347793592590369, 0.00251112585383129, 0.0574457445617481, 
+        0.426472982891481, -0.222560387722977, 0.108163302417362, 
+        0.347793592590369, 0.00251112585383129, 0.0574457445617481, 
+        0.430626666922783, 0.247801246960088, 0.102764173876781, 
+        0.697437097907128, 0.266568717166544, 0.111195285756863, 
+        0.347793592590369, 0.00251112585383129, 0.0574457445617481, 
+        0.426472982891481, -0.222560387722977, 0.108163302417362, 
+        0.711859295886375, -0.241448054489933, 0.120365292587605, 
+        0.347793592590369, 0.00251112585383129, 0.0574457445617481, 
+        0.908361843445933, 0, 0, 0.697437097907128, 0.266568717166544, 
+        0.111195285756863, 0.347793592590369, 0.00251112585383129, 
+        0.0574457445617481, 0.908361843445933, 0, 0, 0.711859295886375, 
+        -0.241448054489933, 0.120365292587605
+        });
+		
+		//construct a data type, which can handle a list of triangulated mash
+		PolygonMesh polygonMesh = new PolygonMesh();
+		int[] tmp = new int[vertexData.size()/3];
+		{
+			for(int i = 0; i<tmp.length; i++) tmp[i]=i;
+			// set a list of the indices of the used list of vertices
+			// normally = {0,1,2,3,...,n}, where n is the number of used vertices 
+			// minus one 
+			polygonMesh.setIndexData(new IntList(tmp));
+			// set the list of vertices
+			polygonMesh.setVertexData(vertexData);
+
+		}
+}
+==>
+
+RL(90) RH(90) Scale(scale) MeshNode.(setPolygons(polygonMesh), 
+setShader(new AlgorithmSwitchShader(new RGBAShader(0,0.8,0), new RGBAShader(0,0.8,0), LeafLightShader)))
+
+;
+
+
+
+// ### Tests.rgg modules
+
+module TestSegment extends Organ() {
+	float diameter;
+	void initiate(Organ o) { 
+		length = 1;
+		diameter = 0.1;
+	}
+}
+==> F(length, diameter);
+
+
+
+
+
+// testing berry 20211124
+
+module Berry(float radius, String in_id_berry) extends LightAbsorptionOrgan {
+	
+	String clusterNumber;
+	String id_berry;
+	//float radius = 0.007;
+	float surfaceTemperature;
+	float storageFactor;
+	float weight;
+	
+	void initiate(Organ o) {			
+		plantNumber = o.plantNumber;
+		order = o.order;
+		rank = o.rank;
+		dayOfDevelopment = dayOfYear;
+		rankOnCane = o.rankOnCane;
+		rankOnParentShoot = o.rankOnParentShoot;
+		rowNumber = o.rowNumber;
+		clusterNumber = (String) (this.plantNumber) + "_" + rankOnCane + "_" + (this.rank);
+		id_berry = in_id_berry;
+		//scale = 1;//0.01;		
+	}
+	
+	void computeDimensions() {
+		area = 4*Math.PI*radius**2; // m²
+		// weight: temporary solution: 7 classes in data, min to max linear artificial values
+		if(radius>=0.008){
+			weight=1.6184700;
+		}
+		else if(radius>=0.007 && radius<0.008){
+			weight=1.5152876;
+		}
+		else if(radius>=0.00625 && radius<0.007){
+			weight=1.4121051;
+		}
+		else if(radius>=0.005 && radius<0.00625){
+			weight=1.3089227;
+		}
+		else if(radius>=.004 && radius<0.005){
+			weight=1.2057402;
+		}
+		else if(radius>=.00315 && radius<0.004){
+			weight=1.1025577;
+		}
+		else if(radius<.00315){
+			weight=0.9993753;
+		}
+	}
+	
+}
+//==> Sphere(radius).(setShader(new AlgorithmSwitchShader(new RGBAShader(0,0.8,0), new RGBAShader(0,0.8,0), BerryLightShader)));
+==> Sphere(radius).(setShader(new AlgorithmSwitchShader(new RGBAShader(0,0.8,0), new RGBAShader(0,0.8,0), BerryLightShader)));
+
+//==> Sphere(radius).(setShader(BLACK));
+
+
+

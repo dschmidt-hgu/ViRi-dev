@@ -1,0 +1,283 @@
+
+import static main_Develop.*;
+import static modules_scene.*;
+import static modules_plant.*;
+import static modules_light.*;
+import static Globals.*; 
+import static Functions.*;                                                       
+import static methods_simulation.*;
+import static input_output.*;
+
+
+// Avoid				
+// works currently only at WinterBud, so I could make a big cone to make it work there
+
+//import de.grogra.rgg.AvoidIntersection;
+// original settings from ViRi 1.0
+const int 		numberOfRays 		= 200; // the higher, the better? 20000								
+const double	openWidthAngle		= 0.3;										
+const double	openHightAngle		= 0.3;									
+const double 	predictedLength		= 0.1;// ? originally > 0, but I want to check immediately at apex position							
+const double	lengthOfRays		= 0.1;// only for visualisation										
+const double	strengthOfChange	= 1;										
+const boolean	showRays			= false;//	true;	//
+
+
+// Use allways transient for instanciating of this class.						
+transient static AvoidIntersection ai; 
+
+public static void InitiateAvoidMechanism(int numberOfRays, double openWidthAngle, double openHightAngle, double predictedLength) {
+	ai = new AvoidIntersection(numberOfRays);
+	ai.setRange(openWidthAngle, openHightAngle, predictedLength);
+}
+
+public static void develop() // this needs more structure
+[
+	Line ==> ; // show lines of method avoid
+
+
+	//(>)+ : (gl:GlobalLocation)
+	(* wb:WinterBud, (wb.dayOfShootDevelopment == dayOfYear) *)
+	==> 
+	initiatePhytomer(wb);//, gl
+	
+	//(>)+ : (gl:GlobalLocation)
+	(* a:Apex, (a.order==1 && (THT(weatherData, 10, dayOfYear, a.dayOfShootDevelopment) * pars[2]) // this is Phytomer appearance (development)
+	/ a.rank >= 1) *) 
+	==> initiatePhytomer(a);	//, gl
+	
+
+	// lateral Apex gets mu depending on the lateral shoot's position on the main shoot
+	// highest lateral growth most fast (analysis 2022 data)
+	(* a:Apex (<--)+ : (i:Internode), 
+	(a.order==2 && i.order==1) *)
+	==>
+	{
+		long numberOfHigherRanks = count((* i (>)+ ni:Internode, (ni.order == 1) *));
+		//println("numberOfHigherRanks: " + numberOfHigherRanks);
+		
+		// get mu from table with numberOfHigherRanks
+		// after cut, there is always one internode left!!
+		// because Apex above cut height is deleted
+		// in analysis X0 means no higher rank, here this means there is 
+		// one more rank of an internode without any other organ
+		float mu;
+		if(numberOfHigherRanks==1) {
+			mu=pars[47];
+		}else if(numberOfHigherRanks==2) {
+			mu=pars[48];
+		}else {
+			mu=pars[49];
+		}
+			
+		
+	}
+	if((THT(weatherData, 10, dayOfYear, a.dayOfShootDevelopment) * mu) / a.rank >= 1) (
+		
+			initiatePhytomer(a)
+		
+	);
+
+	
+	b:AxillaryBud, 
+	(THT(weatherData, 10, dayOfYear, b.dayOfDevelopment) >= b.necessaryTHTforDevelopment && b.order == 2) 			 
+	==> 
+	if(probability(SecShootAppProb(b.rankOfParentInternode))) (
+		initiatePhytomer(b)//FromBud
+	)
+	else(
+		eraseOrgan(b)
+	)		
+	;
+	
+	{derive();}
+]
+
+public static void initiatePhytomer(Organ o) //, Null gl
+[
+	o ==> 
+	
+	{
+		float strength;
+		
+		if(o instanceof Apex || o instanceof WinterBud) { //WinterBud //o instanceof Apex || 
+			ai.lookGM(o, o.x, o.y, o.z, lengthOfRays, strengthOfChange, showRays); //gl
+		}
+		
+		// set day of development for new lateral shoot
+		if(o instanceof AxillaryBud) {
+			o.(setDayOfShootDevelopment(dayOfYear));
+		}
+	}                                 
+
+	Internode.(initiate(o))
+	
+	// Leaf and Petiole 
+	[
+	
+	// move petiole 45° from internode	
+	RU(-45) 
+	// no matter which position in space, rotate now always in the same way
+	
+	AdjustLU 
+	// neutralize different orientations to horizontal plane by pointing down
+	
+	RG 	
+	// move petiole to horizontal (-90) and then to desired position
+	
+	RL(-90 - pars[29 + o.order]) 	 //
+	//F(0.05,0.0025)
+	Petiole.(initiate(o, 0))
+	
+	// rotate turtle (180:leaf's upper side upwards) and point turtle horizontally
+	//RL(- pars[29 + o.order]) 
+	RH(180) RL(- pars[29 + o.order]) 
+	// midrib initially 80°, updated in grow()
+	JMidrib(80) Leaf.(initiate(o))//, setShader(o.order==1?GREEN:RED))
+	
+	] 
+	
+	// Bud for secondary growth, currently occuring on order 2 as well with no effect
+	[RH(180) RL(45) 
+	//Bud(a.order, 0, 0, dayOfYear, SecShootAppTHT(a.rank + 1), a.rank + 1, a.positionOnCane)] 
+	// a.rank + 1 --> actually just rank from parent, but in here rank gets + 1
+	
+	AxillaryBud.(initiate(o))
+	
+	//Sphere(0.1).(setShader(GREEN))
+	// fruit meristem
+	]
+	
+	[
+		FruitMeristem.(initiate(o), determineClusterFate(o))
+	]
+	
+
+	// include random behavior 
+	RH(random(170, 190))
+	RL(random(-10,10)) // originally vice versa
+	// Joint for upwards growth and shoot positioning
+	Joint(new Point3d(
+	o.x, o.y, o.z + 10), computeUpwardsTrend(o), o.rank)
+	//Joint.initiate(o, computeUpwardsTrend(o))
+	//[F(0.15,0.001)]
+	// new apex at the tip
+	Apex.(initiate(o)) 
+	//{derive();}
+	;
+	
+]
+
+public static void eraseOrgan(Organ o)
+[
+	 o ==>> ; 
+]
+
+public static void grow()
+[
+	org:Organ ::> {
+		org.(computeDimensions());
+		//{derive();}
+	}
+	
+	(* jm:JMidrib --> l:Leaf, (l[order] == 1) *) ::> {
+		jm[angle] = MidribAngle(l[scale], l[rank]);
+	}
+	
+	(* jm:JMidrib --> l:Leaf, (l[order] == 2) *) ::> {
+		jm[angle] = - 25;
+	}
+	
+	// fruits
+	
+
+	// currently with variable "withCluster" but prpbably solved before in R and here try catch
+	// -check if cluster exist
+		
+	(* fm:FruitMeristem, (fm.order==1 && dayOfYear >= initBerriesOnDoy) *), fm ==> //&& dayOfYear >149
+		if(berriesON) ( // bad location since ==> may delete objects!
+
+		{
+			loadClusterBerryLocations(fm.plantNumber, fm.rankOnCane, (fm.rank));
+		}
+		//Sphere(0.0075).(setShader(RED))
+		if(clusterBerryLocations_exists != null) ( // && clusterFolder_exists != null
+		
+			RG RL(45) Peduncle(random(0.03115626, 0.04717708))  // F(random(0.03115626, 0.04717708),0.0025)  // RH(90) 
+			// RL(90) M(0.05) RL(-90)
+			RG RU(180)
+		
+			for(int row = 0; row <= clusterBerryLocations.length-1; row++) (	 // clusterBerryLocations.length-1
+			[
+				Translate((Float.parseFloat(clusterBerryLocations[row][0]))/100,
+				(Float.parseFloat(clusterBerryLocations[row][1])/100),
+				(Float.parseFloat(clusterBerryLocations[row][2])/100))
+				//Sphere(Float.parseFloat(clusterBerryLocations[row][4])/100)
+				Berry(Float.parseFloat(clusterBerryLocations[row][4])/100, clusterBerryLocations[row][5]).(initiate(fm), computeDimensions())
+			]
+			)
+			)
+				
+		);
+	
+	{
+		derive(); // originally came after updateGlobalLocation()
+		updateGlobalLocation();
+	}
+
+	{
+		//derive();
+		//repaintView3D();
+	}
+]       
+
+public static void leafAbsorb ()
+[
+	le:Leaf ::> 
+	{
+		//le.calcArea(); // OUT?
+		le.calcLight();		
+	}
+]
+
+public static void berryAbsorb ()
+[
+	be:Berry ::> //LightSensor
+	{
+		//be.calcArea();
+		be.calcLight();
+		//println("abs_m2: " + (be.sz*3 / be.area));
+	}
+]
+
+// improve later when more info about upwards behavior
+// e.g. measure angle to vertical instead of to horizontal
+const float minStrengthTillPlus45DegreesReached = 0.25;//0.25; //0.5  affects shoot's orientation a lot and therefore plant height and endSim day
+const float strengthFromPlus45DegreesAndMore = 0.15; // 0.15 did not test affect after mod
+const float AngleDividerForValues0To1 = 120; // 90, 45 interplay with avoid: affects shoot's runaround obstacles; 45 not applicable anymore because would lead to value > 1
+
+public static float computeUpwardsTrend(Organ o) {
+	Vector3d dir = new Vector3d();
+	dir = direction(o);
+	Vector3d z = new Vector3d(dir.x, dir.y, 0); // that is actually the plane
+	float strength = minStrengthTillPlus45DegreesReached;
+	
+	if(o instanceof Apex | o instanceof WinterBud) { //| o instanceof WinterBud
+		if(dir.z < 0){
+			strength = angle(dir, z) / AngleDividerForValues0To1; //90 //45old model
+			if(strength < minStrengthTillPlus45DegreesReached) {
+				strength = minStrengthTillPlus45DegreesReached;
+			}
+		}
+		if(dir.z >= 0){
+			if(angle(dir, z) >= 45){
+				return(strength = strengthFromPlus45DegreesAndMore);
+			}
+		}	
+	}
+	else  {//if(o instanceof AxillaryBud)
+		// like original model, modify when new info available
+		strength = 0.1;
+	}
+	return(strength);
+}

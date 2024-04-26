@@ -1,0 +1,51 @@
+func;unit;variables;values;active;JavaAccess
+BB = rnorm(mean.BB,sd.BB);doy;mean.BB;112.796903828266;0;0
+BB = rnorm(mean.BB,sd.BB);doy;sd.BB;4.05702621999972;0;1
+maxRank(THT) = IntAppRate * THT;-;IntAppRate;0.045270976489372;1;2
+SecShootAppProb(Rank) = Asym + (R_0-Asym) * exp(-exp(lrc) * Rank);-;Asym;0.98;1;3
+SecShootAppProb(Rank) = Asym + (R_0-Asym) * exp(-exp(lrc) * Rank);-;R_0;-0.537584612558524;1;4
+SecShootAppProb(Rank) = Asym + (R_0-Asym) * exp(-exp(lrc) * Rank);-;lrc;-0.958477572273525;1;5
+SecShootAppTHT(Rank,n) = rnorm( n=n, mean = Intercept + a * Rank + b* Rank^2, sd=sd);THT;Intercept;364.607709537092;0;6
+SecShootAppTHT(Rank,n) = rnorm( n=n, mean = Intercept + a * Rank + b* Rank^2, sd=sd);THT;a;-6.30687037946453;0;7
+SecShootAppTHT(Rank,n) = rnorm( n=n, mean = Intercept + a * Rank + b* Rank^2, sd=sd);THT;b;0.513037716134369;0;8
+SecShootAppTHT(Rank,n) = rnorm( n=n, mean = Intercept + a * Rank + b* Rank^2, sd=sd);THT;sd;31.2433734509766;0;9
+IL1(Rank,THTage) =  IL1.Asym(Rank) * (1 - exp(-exp(lrc) * THTAge));cm;lrc;-3.18124920901097;1;10
+IL1.Asym(Rank <= 7) = m * Rank + Int;cm;Int;-0.556155696890473;1;11
+IL1.Asym(Rank <= 7) = m * Rank + Int;cm;m;1.57292641717936;1;12
+IL1.Asym(Rank > 7) =  (Rank + 1) mod 3) * a + b;cm;a;0.721177853440127;1;13
+IL1.Asym(Rank > 7) =  (Rank + 1) mod 3) * a + b;cm;b;9.09085182227872;1;14
+IL2(Rank,THTage) =  IL2.Asym(Rank) * (1 - exp(-exp(lrc) * THTAge));cm;lrc;-3.97055940352048;1;15
+IL2.Asym(Rank) = max +(R0-max)*exp(-exp(lrc) * Rank);cm;max;9.47884983337281;1;16
+IL2.Asym(Rank) = max +(R0-max)*exp(-exp(lrc) * Rank);cm;R0;-2.48224687777779;1;17
+IL2.Asym(Rank) = max +(R0-max)*exp(-exp(lrc) * Rank);cm;lrc;-0.118282761239622;1;18
+LA(LSL) = (scaleFactor * LSL)^2;cm2;scaleFactor;0.6869294;1;19
+LSL1(THTage) = LSL1.Asym(Rank)  * (1 - exp(-exp(lrc) *  THTage));cm;lrc;-4.18186933756595;1;20
+LSL1.Asym(Rank) = asymR +(R0 - asymR) * exp(-exp(lrcR) * Rank);cm;asymR;19.7196378333227;1;21
+LSL1.Asym(Rank) = asymR +(R0 - asymR) * exp(-exp(lrcR) * Rank);cm;R0;2.54994959920575;1;22
+LSL1.Asym(Rank) = asymR +(R0 - asymR) * exp(-exp(lrcR) * Rank);cm;lrcR;-0.813128217128007;1;23
+LSL2(THTage) = Asym * (1 - exp(-exp(lrc) *  THTage));cm;Asym;11.941843216682;1;24
+LSL2(THTage) = Asym * (1 - exp(-exp(lrc) *  THTage));cm;lrc;-3.0008009024611;1;25
+PetL1(LSL1) = a * LSL1 + b * LSL1^2;cm;a;0.312196256617585;1;26
+PetL1(LSL1) = a * LSL1 + b * LSL1^2;cm;b;0.006038144146167;1;27
+PetL2(LSL2) = a * LSL2 + b * LSL2^2;cm;a;0.324666355466653;1;28
+PetL2(LSL2) = a * LSL2 + b * LSL2^2;cm;b;0.007073924713539;1;29
+PetAng1 = Intercept;°;Intercept;40.0440919679817;1;30
+PetAng2 = Intercept;°;Intercept;35.6238649053923;1;31
+BB.THT.doy = rnorm(BB.pred,sd.BB);Date-2018/doy;BB.THT(doy) (21.04.2018);111;1;32
+BB.THT.doy = rnorm(BB.pred,sd.BB);THT;sd.BB;4.05;1;33
+D(T0,Tmin,Tmax,Tmean) = if(Tb >= Tmax){return(0)}else if( Tmin < T0 & T0 < Tmax)	{return((Tmax-T0)/2 * (Tmax-T0)/(Tmax-Tmin))}else if( Tb <= Tmin){return(Tmean-T0)};°C;T0;5.9;1;34
+BB.pred(doy>=doy_start) = which(sum(D) >= Dmean +/-Dsd);doy;doy_start (1stMarch);1.03;1;35
+BB.pred(doy>=doy_start) = which(sum(D) >= Dmean +/-Dsd);doy;Dmean;186.1;1;36
+BB.pred(doy>=doy_start) = which(sum(D) >= Dmean +/-Dsd);doy;Dsd;24.7;1;37
+MidAng1(LSL1,Rank)  = I + c1 * LSL1 + c2* Rank + c3 * LSL1 * Rank;°;I;50.2723362857435;1;38
+MidAng1(LSL1,Rank)  = I + c1 * LSL1 + c2* Rank + c3 * LSL1 * Rank;°;c1;-6.1389930787212;1;39
+MidAng1(LSL1,Rank)  = I + c1 * LSL1 + c2* Rank + c3 * LSL1 * Rank;°;c2;-5.44651247774916;1;40
+MidAng1(LSL1,Rank)  = I + c1 * LSL1 + c2* Rank + c3 * LSL1 * Rank;°;c3;0.474933577122149;1;41
+MidAng2  = I;°;I;-25.0179216065862;1;42
+SecShootAppTHT(Rank,n) = max(THTmin,rnorm( n=n, mean = Intercept + a * Rank , sd=sd));THT;Intercept;357.914993203344;1;43
+SecShootAppTHT(Rank,n) = max(THTmin,rnorm( n=n, mean = Intercept + a * Rank , sd=sd));THT;a;-18.5636349186952;1;44
+SecShootAppTHT(Rank,n) = max(THTmin,rnorm( n=n, mean = Intercept + a * Rank , sd=sd));THT;THTmin;66.2676229372757;1;45
+SecShootAppTHT(Rank,n) = max(THTmin,rnorm( n=n, mean = Intercept + a * Rank , sd=sd));THT;sd;29.137665068293;1;46
+maxLateralRank(THT) = LateralIntAppRate * THT;-;IntAppRateX0;0.01904713;1;47
+maxLateralRank(THT) = LateralIntAppRate * THT;-;IntAppRateX1;0.01474438;1;48
+maxLateralRank(THT) = LateralIntAppRate * THT;-;IntAppRateX2;0.0107757;1;49

@@ -1,0 +1,134 @@
+
+
+
+
+import java.util.*; //ArrayList
+import static main_Develop.*;
+import java.io.FileWriter; // init files
+import java.io.PrintWriter; // init files
+import de.grogra.xl.util.IntList; // 
+import de.grogra.xl.util.FloatList; //
+
+import static input_output.*;
+
+// globals: objects used in different files (before model runs)
+
+static final String inputPath = 
+"/full/path/to/ViRi_Input/";
+
+static final String outputPath =
+"/full/path/to/ViRi_Output/";
+
+
+
+
+static String weatherFile = "T_Geisenheim_" + year + ".csv"; // final?
+
+static String minuteWeatherFile = "T10_minutes_Geisenheim_" + year + ".csv";
+
+static String clusterFolderNumber;
+
+
+static final String parametersFile = "groImpTable.csv";
+
+
+static int dayOfYear;
+static int hour;
+static float minutes;
+static float hourOfDay;//=0;//12; // !! was apparently for Henke Light model, not in use
+static String time;
+static float timeInterval;
+static int numberOfPlants;
+static float avHeight;
+static int countBend;
+static long seed;
+static int seedLightModel;
+static float absorbedLightOfmiddleSquareSensor;
+static float tempOfMinute;
+static float humidityOfMinute;
+static boolean isPruned;
+
+static String[][] weatherData;
+static String[][] hourlyWeatherData;
+static String[][] minuteWeatherData;
+static String[][] clusterBerryLocations;
+//static String[][] parameters;
+static FloatList pars = new FloatList();
+
+static String processNumber;
+//static String test;
+static String LeavesFile_exists = false;
+static String LeavesFileDailyData_exists = false;
+static String middleSquareSensorFile_exists = false;
+static String RowSensorsFile_exists = false;
+static String BerriesFile_exists = false;
+static String BerriesFileDailyData_exists = false;
+static String clusterBerryLocations_exists = false;
+static String minuteWeatherDataFile_exists = false;
+static String clusterFolder_exists = false;
+static String BerriesFileMinuteData_exists = false;
+
+// ### Scene
+
+// N-S
+/*
+static float lengthPost = 2;
+static float widthPost = 0.1;
+static float distPost = 4.5;//6;//4.5;
+static float rowSpacing = 1.8;
+static float plantSpacing = 0.9;//1.2;//0.9;
+
+// wire heigths
+static float[] WireHeights = {0.7, 0.9, 1.1, 1.4, 1.7};
+*/
+
+// N-S FACE BS Force Exp
+
+static float lengthPost = 2;
+static float widthPost = 0.1;
+static float distPost = 5;//6;//4.5;
+static float rowSpacing = 2;
+static float plantSpacing = 1;//1.2;//0.9;
+
+// wire heigths
+static float[] WireHeights = {0.95, 1.1, 1.3, 1.6, 1.9};
+
+
+/*
+// Bailey
+static float lengthPost = 2;
+static float widthPost = 0.1;
+static float distPost = 4.5;//6;//4.5;
+static float rowSpacing = 3;
+static float plantSpacing = 0.8;//1.2;//0.9;
+*/
+/*
+// Wind
+static float lengthPost = 2;
+static float widthPost = 0.1;
+static float distPost = 4.5;//6;//4.5;
+static float rowSpacing = 2;
+static float plantSpacing = 0.9;//1.2;//0.9;
+
+// wire heigths
+static float[] WireHeights = {0.9, 1.1, 1.3, 1.7, 1.9};
+*/
+// potted plants
+/*
+static float lengthPost = 0.55+0.0225;
+static float widthPost = 0.1;
+static float distPost = 2;//1.5;// 4.5;//6;//4.5;
+static float rowSpacing = 1.8;//2;//1.8;
+static float plantSpacing = 0.4;//0.3;// 0.9;//1.2;//0.9;
+// wire heigths
+//static float[] WireHeights = {0.7, 0.0, 1.2, 1.8};
+static float[] WireHeights = {0.7, 0.7, 0.95, 1.4, 1.7};
+*/
+// Bailey:
+//static float[] WireHeights = {0.9, 0.9, 1.1, 1.4, 1.7};
+//static float[] RowDistance = {-3.6, -1.8, 0, 1.8, 3.6, 5.4};
+
+//static float humidity = 0.5;
+static float eps = 0.95 ; // ground longwave, // Ponce de Leon 2021 eps= 0.95
+
+

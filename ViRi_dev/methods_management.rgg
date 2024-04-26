@@ -1,0 +1,400 @@
+
+import static main_Develop.*; 
+import static Light.*;
+import static input_output.*;
+
+import static modules_scene.*;
+import static modules_plant.*;
+import static modules_light.*;
+//import static Functions.*; // use methods in Riesling
+import static Globals.*; // use methods in Riesling
+import de.grogra.ray.physics.Spectrum3d;
+
+//cut all shoots above given height
+/*public static void cutAtHeight(float height) {
+	[
+	(* i:Internode, (i.z >= height) *), i ==> ;
+	]
+}*/
+
+public static void cutAtHeight(float height) {
+	[
+	(* o:Organ, (o.z >= height) *), o ==> ; // && o.order == 1
+	]
+}
+
+
+
+// repositioning of joints due to bending of shoots
+// and setup pair of wires 
+public static void bend(int countBend)
+[
+	{
+		float height = WireHeights[countBend + 1];
+	}
+	// apply Shoot Positioning (SP)
+	(* i:Internode (>)+ j:Joint (>)+ : (jw:Joint) *), 
+	// select shoot with its first internode (order==1 && rank==1)
+	(i[order] == 1 && i[rank] == 1 
+	// identify first node above wire (before SP)
+	&& jw.z > height
+	// determine if shoot gets caught at all
+	// 5cm buffer because apex could finally be below the final wire height
+	&& sum((* i (>)+ inter:Internode, (inter.z >= 
+	WireHeights[0]) *).length) - 0.05 >= height - WireHeights[0]
+	
+	&&	j.z < height - 0.05 // to avoid falting to point below
+	&& 	j.z > height - 0.5 // to restrict bend due to stiffness
+	// check if joint is outside the catch wire inner zone
+	&& 	jw.x > i.x + (widthPost / 2) // global position
+	| jw.x < i.x - (widthPost / 2) // global position
+	), j 
+	==>
+	//::>
+	{
+		float numbJoints = 
+		count((* joi:Joint (<)+ i, (joi.z < height - 0.05) *)); 		// !!! 0.1 better 0.05 like above
+		float posWire=0;
+		
+		[
+
+		(* w:TrunkWire, (w.rowNumber == i.rowNumber)*) ::> {
+			//println("all_w.x: " + location(w).x);
+			//println("all_i.x: " + i.x);
+			if(jw.x > i.x) {
+				posWire = location(w).x - 0.01 + (widthPost / 2);
+			}
+			else {
+				posWire = location(w).x + 0.01 - (widthPost / 2);
+			//	println("i.x"+i.x);
+				//println("w.x"+location(w).x);
+			}
+		}
+		]
+
+		float leftStrength = 1-j[strength];
+		float strength = j[strength]+(leftStrength*((1 / numbJoints) * (j[number]+1))**2); //leftStrength* //j[strength]+
+		//println("?: "+posWire);
+		//{updateGlobalLocation();}
+		/*j.target.x = posWire;
+		j.target.y = jw.y;
+		j.target.z = height;
+		j.strength = strength;
+		{updateGlobalLocation();}
+		{repaintView3D();}*/
+	}
+	//[M(0.01) TextLabel("a: "+ Float.toString(j[strength])).(setColor(new Color3f(0, 0.5, 0)))]
+	
+	jn:Joint(new Point3d(posWire, jw.y, height),
+	strength, j[number]) //Sphere(0.03).(setShader(BLUE))	// j[strength] +
+	;
+	
+
+	// place paire of wires
+	==> ^
+	for(int g = 0; g < numberOfRows; g++)(
+		// two middle wires
+		// first moving backwards to FirstRowXPosition with "-"
+		// (1.8*g) --> chose which row to be set
+		// ((1.8 * Rows) / 2) + 0.9) --> setFirstRowXAsStartX
+		[Translate(-((1.8 * g) - ((1.8 * numberOfRows) / 2) + 0.9) + widthPost / 2, 
+			(distPost * numberOfRowSegments)/2, height) RL(90) // 1.8 = row distance
+		Wire(distPost * (numberOfRowSegments), 0.01)]
+		[Translate(-((1.8 * g) - ((1.8 * numberOfRows) / 2) + 0.9) - widthPost / 2, 
+			(distPost * numberOfRowSegments)/2, height) RL(90)  // 1.8 = row distance
+		Wire(distPost * (numberOfRowSegments), 0.01)]
+	)
+	;   
+]
+
+
+// Apply bend if more than 90% of shoots are above final wire height
+public static int ApplyBend(int countBend)
+{
+	if(countBend < 4){
+		float relation = 0;
+		// looks like I can use computeRelationHighShootsToAllShoots() here
+		long count90 = count((* a:Apex, (a[order] == 1 && 
+		a.z > WireHeights[countBend + 1]) *));
+		long numbAllShoots = 
+		count((* i:Internode, (i[order] == 1 && i[rank] == 1) *));
+		if(numbAllShoots > 0){	
+			relation = (float) count90/numbAllShoots;
+		}
+			if(relation > 0.9){
+				bend(countBend);
+				// here comes method setup paor of wires
+				countBend++;
+			}
+		}
+		// remove wire 2 and 4
+		if(countBend ==  2 | countBend == 4){
+			[				
+				(* w:Wire, ((float) Math.round(location(w).z * 10 ) / 10 == 
+				WireHeights[1] | (float) Math.round(location(w).z * 10 ) / 10 ==
+				WireHeights[3]) *), w ==>> ;
+			]
+		}
+		{
+			derive(); // if this out, light computations are wrong (old string, i.e. leaf orientation)
+			//System.gc();
+		}
+		return(countBend);
+}
+
+public static void defoliateVerticalZoneLeftSideOfCanePointingSouth(float bottom, float top)
+[
+	
+	// paper leaf removal 
+
+	(* w:Trunk (-->)+ l:Leaf *), (
+	(l.z > bottom && l.z < top &&
+	l.x - location(w).x < 0.05 && direction(l).x < 0) ||
+	(l.z > bottom && l.z < top &&
+	l.x - location(w).x < -0.05 && direction(l).x > 0)
+	), l ==> ;
+	
+]
+
+public static void applyDefoliateVerticalZoneLeftSideOfCanePointingSouth(int applicationDay, float bottom, float top) {
+	if(dayOfYear == applicationDay) {
+		defoliateVerticalZoneLeftSideOfCanePointingSouth(bottom, top);
+		//defoliateVerticalZoneRightSideOfCane(bottom, top);
+		derive();
+	}
+}
+
+
+public static void defoliateVerticalZoneRightSideOfCanePointingSouth(float bottom, float top)
+[
+	//(* l:Leaf, w:TrunkWire *), (w.rowNumber == l.rowNumber &&
+	(* w:Trunk (-->)+ l:Leaf *), (
+	(l.z > bottom && l.z < top && 
+	l.x - location(w).x > -0.05 && direction(l).x > 0) ||
+	(l.z > bottom && l.z < top &&
+	l.x - location(w).x > 0.05 && direction(l).x < 0)
+	), l ==> ; 
+]
+
+public static void applyDefoliateVerticalZoneRightSideOfCanePointingSouth(int applicationDay, float bottom, float top) {
+	if(dayOfYear == applicationDay) {
+		defoliateVerticalZoneRightSideOfCanePointingSouth(bottom, top);
+		//defoliateVerticalZoneRightSideOfCane(bottom, top);
+		derive();
+	}
+}
+
+
+// # sensor measurements
+
+public static void setRowSensor(int firstRow, int lastRow, float bottomPosition,
+float height) {
+	[
+		==>^
+		M(bottomPosition+0.5*height)
+		for(int row = firstRow-1; row <= lastRow-1; row++)(
+			RH(180)
+			//Translate(RowDistance[row], 0, 0)
+			Translate((1.8 * row) - ((1.8 * numberOfRows) / 2) + 0.9, 0, 0)	
+			for(int p = 0; p < numberOfRowSegments; p++)(
+				// go to next post
+				Translate(0, 4.5 -(4.5 * p) - 0.05, 0)
+				RL(90)
+				[ITile.(initiate(row), setGeometry(4.5,height))]				
+				M(4.4)
+				RL(-90)
+				
+			)
+
+		)
+		;
+	]		
+}
+
+public static void setSensorLines(int firstRow, int lastRow, float height) {
+	[
+		==>^
+			// go to bunch zone height
+			M(height) 
+			
+			for(int row = firstRow-1; row <= lastRow-1; row++) (
+			[
+				RH(180)
+				// jump to first row
+				Translate((1.8 * row) - ((1.8 * numberOfRows) / 2) + 0.9, 0, 0)	
+				
+				// along row (y-axis)
+				for(int p = 0; p < numberOfRowSegments; p++)(
+				
+					//				
+					// go to next post
+					Translate(0, 2.25*numberOfRowSegments -(4.5 * p) - 0.05, 0)//
+					RL(90) 
+					// sensor line 
+					[
+						RH(90) ITile.(initiate(row+1), setGeometry(4.4,0.2), setIdNumber(height))
+					]	
+					RL(-90)
+				)
+			]
+			)				
+			;			
+		]
+		
+}
+
+public static void applyRowSensorLine(int trialNumber, int firstRow, int lastRow, float height) {
+	
+	//createFileForSensors();
+	setSensorLines(firstRow, lastRow, height);
+	derive();
+	lm.compute();
+	[	
+		ls:ITile ::> { //LightSensor
+			ls.calcLight();
+		}
+		{
+			printRowSensors(trialNumber, RowSensorsFile, dayOfYear, seed); //trialNumber
+		}
+		ls:ITile ==>> ;
+	]
+}
+
+public static void applyFourRowSensorLines(int trialNumber, int firstRow, int lastRow) {
+	for(int l = 0; l<=3; l++) {
+		float bottomHeight = 0.7+(0.1*l);
+		applyRowSensorLine(trialNumber, firstRow, lastRow, bottomHeight);
+	}
+}
+		
+
+
+
+public static void applymiddleSquareSensor(String type, float height, float lengthSide, float sideB, boolean isLongwave, float temp,
+String skyOrGround, float totalLongwaveSky, float totalLongwaveGround) {
+	if(type == "flat") {	
+		[
+			==>^
+			// middle sensor m²
+			[Translate(lengthSide/2,0,height) RU(-90) ITile.(setGeometry(lengthSide,lengthSide))]; 
+		]
+		derive();
+		lm.compute();
+		absorbedLightOfmiddleSquareSensor = 0;
+		[	
+			ls:ITile ::> { //LightSensor
+				ls.calcLight();
+				absorbedLightOfmiddleSquareSensor = ls.abs_fullSpec_m2;
+				println("middleSquareSensor: " + absorbedLightOfmiddleSquareSensor + " W/m2");
+				//println(ls.sx);
+				//derive();
+			}
+			{
+				if(hourlyModeOn) {
+					//printmiddleSquareSensorHourly(middleSquareSensorFile, dayOfYear, (int) hourOfDay); //trialNumber	
+					printmiddleSquareSensorMinute(middleSquareSensorFile, dayOfYear, time, isLongwave, temp, skyOrGround,
+					totalLongwaveSky, totalLongwaveGround);
+				}
+				else {
+					printmiddleSquareSensor(middleSquareSensorFile, dayOfYear); //trialNumber
+				}
+			}
+			ls:ITile ==>> ;
+		]	
+	}	
+	
+	
+		if(type == "disk") {
+		[
+			==>^
+			// middle sensor 
+			M(height) [ls:diskSensor(Math.sqrt(1/Math.PI)).(getArea())]; 
+		]
+		derive();
+		lm.compute();
+		absorbedLightOfmiddleSquareSensor = 0;
+		[	
+			ls:diskSensor ::> { //LightSensor
+				ls.calcLight();
+				absorbedLightOfmiddleSquareSensor = ls.sz*3/ls.area; //* fractionPAR
+				println("middleDiskSensor: " + absorbedLightOfmiddleSquareSensor + " W/m2");
+			}
+			{
+			if(hourlyModeOn) {
+				//printmiddleSquareSensorHourly(middleSquareSensorFile, dayOfYear, (int) hourOfDay); //trialNumber	
+				printmiddleSquareSensorMinute(middleSquareSensorFile, dayOfYear, time, isLongwave, temp, skyOrGround,
+				totalLongwaveSky, totalLongwaveGround);
+			}
+			}
+			ls:diskSensor ==>> ;
+		]	
+		
+	}
+	
+	
+	if(type == "rectangular") {
+		[
+			==>^
+			// middle sensor m²
+			//[Translate(lengthSide/2,0,height) RU(-90) 
+			ITile.(setGeometry(lengthSide,sideB))
+		//]
+		; 
+		]
+		derive();
+		lm.compute();
+		absorbedLightOfmiddleSquareSensor = 0;
+		[	
+			ls:ITile ::> { //LightSensor
+				ls.calcLight();
+				println("AREA: " + ls.area);
+				absorbedLightOfmiddleSquareSensor = ls.abs_fullSpec_m2; //* fractionPAR
+				//println("middleSquareSensor: " + absorbedLightOfmiddleSquareSensor + " W/m2");
+				println("middleSquareSensor: " + ls.abs_fullSpec_m2 + " W/m2");
+				//println("middleSquareSensor: " + ls.abs_PAR_m2 + " W/m2");
+				//println("middleSquareSensor: " + absorbedLightOfmiddleSquareSensor + " W/m2");
+				//println(ls.sx);
+				//derive();
+			}
+			{
+				if(hourlyModeOn) {
+					//printmiddleSquareSensorHourly(middleSquareSensorFile, dayOfYear, (int) hourOfDay); //trialNumber	
+					printmiddleSquareSensorMinute(middleSquareSensorFile, dayOfYear, time, isLongwave, temp, skyOrGround,
+					totalLongwaveSky, totalLongwaveGround);
+				}
+				else {
+					printmiddleSquareSensor(middleSquareSensorFile, dayOfYear); //trialNumber
+				}
+			}
+			ls:ITile ==>> ;
+		]
+		
+	}
+}
+
+public static void setCardinalPointSensors()
+[
+	==>^ 
+
+	[RU(90) M(-0.5) RU(-90) M(0.7) ITile.(initiate(1), setGeometry(1,1), setStringID("east"))]
+	[RU(90) M(0.5) RU(-90) M(0.7) ITile.(initiate(1), setGeometry(1,1), setStringID("west"))]
+	[RL(90) M(-0.5) RL(-90) M(0.7) RH(90) ITile.(initiate(1), setGeometry(1,1), setStringID("south"))]
+	[RL(90) M(0.5) RL(-90) M(0.7) RH(90) ITile.(initiate(1), setGeometry(1,1), setStringID("north"))]
+	;
+]
+
+public static void applyCardinalPointSensors() {
+		//createFileForSensors();
+	setCardinalPointSensors();
+	derive();
+	lm.compute();
+	[	
+		ls:ITile ::> { //LightSensor
+			ls.calcLight();
+		}
+		{
+			printCardinalPointSensors(CardinalPointSensorsFile, dayOfYear); //trialNumber
+		}
+		ls:ITile ==>> ;
+	]
+}

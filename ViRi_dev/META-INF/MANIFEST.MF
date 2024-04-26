@@ -1,0 +1,40 @@
+
+Name: methods_simulation.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: Light.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: ViRi.gs
+Content-Type: application/x-grogra-registry+xml
+
+Name: main_Develop.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: graph.xml
+Content-Type: application/x-grogra-graph+xml
+
+Name: modules_plant.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: Globals.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: modules_light.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: methods_plant.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: methods_management.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: modules_scene.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: Functions.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+
+Name: input_output.rgg
+Content-Type: text/x-grogra-rgg; charset=UTF-8
+

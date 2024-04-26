@@ -1,0 +1,682 @@
+
+import static modules_scene.*;
+import static modules_plant.*;
+import static modules_light.*;
+import static Functions.*;
+import static input_output.*;
+import static Globals.*; 
+import static Light.*; 
+
+import static main_Develop.*;
+import static methods_plant.*;
+import static methods_simulation.*;
+import static methods_management.*;
+
+
+public static void testSensors() {
+	createFileForRowSensors();
+	setSensorLines(1, 7, 0.75);
+	derive();
+	lm.compute();
+	[	
+		ls:ITile ::> { //LightSensor
+			ls.calcLight();
+		}
+		{
+			printRowSensors(1, RowSensorsFile, dayOfYear, seed); //trialNumber
+		}
+		ls:ITile ==>> 
+		;//derive();
+	]
+}
+	
+public static void testPrintFilesQuery() 
+[
+	/*(* t:Trunk (-->)+ i:Internode (<--)+ :(pSh:Internode), 
+	(i[order] > 0 && pSh[order] == i[order] - 1)*) */ 
+	
+	(* t:Trunk (-->)+ i:Internode (<--)+ :(pSh:Internode), 
+	(i[order] > 0 && pSh[order] == i[order] - 1)*) // 
+	::> {
+		println(t.length);
+	}
+	{println("runTestPrintFilesQuery");}
+]
+/* out if not Evers light model on
+// print light distance
+public static void lightDistance() {
+	double d = 10;
+	println(d);
+	println(Math.max(10,infinite?d*nrClones:d));
+}*/
+
+// end criterium, relation between shoots > maxHeight and all shoots
+public static void printRel() {
+	long count90 = count((* a:Apex, (a[order] == 1 && 
+	a.z > maxHeight) *));		
+	long numbAllShoots = count((* i:Internode, (i[order] == 1 && 
+	i[rank] == 1) *));
+	println("Relation = " + (float) count90/numbAllShoots);
+	println("#c90: " + count90);
+	println("#shoots: " + numbAllShoots);
+}
+
+public static void removeLeaves(int order)
+[
+	l:Leaf, (l.order > order) ==> ;
+]
+
+// not in use, some old tests for defoliation
+
+public static void removeLeaves ()
+[
+	//l:Leaf, (location(l).z >= 0.7 && location(l).x > 0) ==> ;
+	//(* i:Internode *), (i[order] == 0 && i[rank] > 0), i ==> Box(0.1,0.05,0.01);
+	
+	//(* (l:Leaf){3} *), (location(l).z >= 0.7 && location(l).x > 0), l ==> ;
+	(* l:Leaf *), (l.z >= 0.7 && l.z <= 1.1 && direction(l).x < 0), l ==> ;
+	/*
+	(* i:Internode (-->){0,3} l:Leaf *), (i[order] == 0 &&
+	i[rank] == 1 &&
+	location(l).z >= 0.7 && location(l).x > 0), l ==> Box(0.1,0.05,0.01);
+	
+	{	
+		for(int count = 0; count <= 1; count++) {
+			[
+				//l:Leaf ==> ;
+				//(* i:Internode *), (i[order] == 0), i ==> ;
+				//(* i:Internode (-->)+ l:Leaf *), (i[order] == 0), l ==> ;
+				
+				(* i:Internode (-->)+ : (l:Leaf) *), (i[order] == 0 &&
+				location(l).z >= 0.7 && location(l).x > 0), l ==> ;
+			]
+			println("loop");
+		}
+	}*/
+	/*
+	l:Leaf ==>
+	for(int count = 0; count <= 3; count++) (
+		println("T")
+	); */
+]
+
+/* out if not Evers light model on
+// print sun properties
+public static void printDLight()
+{
+	clearConsole();
+	for (int j=0; j <= n-1; j++) {
+		println("Beta: " + betaAzimSdr[0][j]);
+		println("Azimuth: " + betaAzimSdr[1][j]);
+		println("Power: " + 1e6 * 0.55 * 4.55 * betaAzimSdr[2][j] / (dayLength*60*60));
+	}
+}
+*/
+
+// ### Scenes for initiation
+
+public static void Scene_SingleCluster()
+[
+	{
+
+		clearConsole();
+		if(fixedSeed == false){ // !=fixedSeed
+			seed = (long) random(0,1000000); 
+			//println("Seed: " + seed);
+		}
+		if(fixedSeed){
+			seed = 123164;//219007;//595419;
+		}
+		setSeed(seed);
+		//filesExist = false;
+		loadWeatherData(year);
+		loadParameters();
+		dayOfYear = budBurst -15;//(int) pars[0] - 15;
+		if(dayOfYearSetManually) {
+			dayOfYear = startAtThisDayOfYear;
+		}
+		// for Henke light model
+		//hourOfDay = 11;
+		avHeight = 0;
+		countBend = 0;
+		numberOfPlants = numberOfRows * plantsPerRow;
+		int plantNumber = 0;
+		int clusterFolderNumber = 1;
+
+	}
+	Axiom ==> 
+//	[M(-0.3) Internode.(initiateFromBud(b, 0.01, 0.005, b[order]+1, b[rank]+1))]
+	if(compass) (
+		[Translate(0,0,-3) compass(1.5)]
+	)
+	//[globalXAxis(2)]
+	//[globalYAxis(2)]
+	//[globalZAxis(2)]
+	
+	if(light) (		
+		[df:DiffuseLightOfSky]
+		[dr:DirectLightOfSun]
+		if(longwaveOn) (
+			[dfLLSKY:DiffuseLongwaveLightOfSky]
+			[dfLLGROUND:DiffuseLongwaveLightOfGround]
+			{
+				dfLLSKY.initiate(10);
+				dfLLGROUND.initiate(10);
+			}
+		)
+
+		
+		{
+			df.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			dr.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			
+		}
+	)
+	M(-0.7)
+	Trunk(0.7, 0.06, 0) 
+	//M(-0.0079) 
+	wb:WinterBud.(initiate(0, 0, 0, 0, 0, 0))
+
+	{
+	//loadClusterBerryLocations(0, 1, 4);
+	clusterBerryLocations = readTxt(inputPath+ "/cluster_R/Spheres180" + ".csv");
+	println(clusterBerryLocations);
+	}
+	
+	RG RL(45) Peduncle(random(0.03115626, 0.04717708))  // F(random(0.03115626, 0.04717708),0.0025)
+
+	RG RU(180)
+
+	for(int row = 0; row <= clusterBerryLocations.length-1; row++) (	 // clusterBerryLocations.length-1
+	[
+		Translate((Float.parseFloat(clusterBerryLocations[row][0]))/100,
+		(Float.parseFloat(clusterBerryLocations[row][1])/100),
+		(Float.parseFloat(clusterBerryLocations[row][2])/100))
+		//Sphere(Float.parseFloat(clusterBerryLocations[row][4])/100)
+		Berry(Float.parseFloat(clusterBerryLocations[row][4])/100, clusterBerryLocations[row][5]).(initiate(wb), computeDimensions())
+	]
+	)	
+	[
+		//Translate(0.025,-0.025,0.01) RL(-90) RU(155) RL(-40) Leaf.(initiate(wb), scale=0.1)
+	]
+	;
+	
+]
+
+
+
+public static void Scene_SingleBerry()
+[
+	{
+
+		clearConsole();
+		if(fixedSeed == false){ // !=fixedSeed
+			seed = (long) random(0,1000000); 
+			//println("Seed: " + seed);
+		}
+		if(fixedSeed){
+			seed = 123164;//219007;//595419;
+		}
+		setSeed(seed);
+		//filesExist = false;
+		loadWeatherData(year);
+		loadParameters();
+		dayOfYear = budBurst -15;//(int) pars[0] - 15;
+		if(dayOfYearSetManually) {
+			dayOfYear = startAtThisDayOfYear;
+		}
+		
+		avHeight = 0;
+		countBend = 0;
+		numberOfPlants = numberOfRows * plantsPerRow;
+		int plantNumber = 0;
+		//println("humidity: " + getHumidity5cm(minuteWeatherData, 200, 4, 32));
+		println("eps: " + eps);
+	}
+	Axiom ==> 
+//	[M(-0.3) Internode.(initiateFromBud(b, 0.01, 0.005, b[order]+1, b[rank]+1))]
+	
+	//[Translate(0,0,-3) compass(1.5)]
+	
+	//[globalXAxis(2)]
+	//[globalYAxis(2)]
+	//[globalZAxis(2)]
+	
+	if(light) (		
+		[df:DiffuseLightOfSky]
+		[dr:DirectLightOfSun]
+		if(longwaveOn) (
+			[dfLLSKY:DiffuseLongwaveLightOfSky]
+			[dfLLGROUND:DiffuseLongwaveLightOfGround]
+			{
+				dfLLSKY.initiate(10);
+				dfLLGROUND.initiate(10);
+			}
+		)
+
+		
+		{
+			df.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			dr.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			
+		}
+	)
+	
+	[
+	//M(1.1)
+	
+	M(-0.7) 
+	
+	//M(1.3)
+	Trunk(0.7, 0.06, 0) 
+	//M(-0.0079) 
+	wb:WinterBud.(initiate(0, 0, 0, 0, 0, 0))
+	//M(1)
+	//SensorNode().(setRadius(0.008))
+	//[Translate(0.004, 0.004, 0.01) Box(0.0001,0.008,0.008).(setShader(BLACK))]
+	
+	b:Berry(0.008, "0").(initiate(wb), computeDimensions())
+	]
+	//[Translate(0.004, 0.004, 1.125) RL(90) F]   
+	
+
+	//Berry(0.8).(initiate(0,1,1,dayOfYear,0,0,0), computeDimensions());
+	[
+		/*
+
+		//Translate(-0.1,-0.1,-0.75) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))
+		//Translate(-0.1,-0.1,1.5) RL(-90) RU(45) RL(-20) RL(0) Trunk(0.7, 0.06, 0).(setShader(BLACK))
+		[Translate(1.1,-0.1,1.75) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		[Translate(-1.1,-0.1,1.55) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		[Translate(.51,-0.1,2.2) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		[Translate(.11,-0.1,1.8) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		[Translate(.51,-0.1,2.2) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		RH(45)
+				[Translate(1.1,-0.1,1.75) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		[Translate(-1.1,-0.1,1.55) RL(-90) RU(45) RL(-5) Leaf.(initiate(wb))]
+		[Translate(.51,-0.1,2.2) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		[Translate(.11,-0.1,1.8) RL(-90) RU(45) RL(-10) Leaf.(initiate(wb))]
+		[Translate(.51,-0.1,2.2) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+				[Translate(.51,-0.1,2.2) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		RH(-45) Translate(-1.2,0,0)
+				[Translate(1.1,-0.1,1.75) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		[Translate(-1.1,-0.1,1.55) RL(-90) RU(45) RL(-5) Leaf.(initiate(wb))]
+		[Translate(.51,-0.1,2.2) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		[Translate(.11,-0.1,1.8) RL(-90) RU(45) RL(-10) Leaf.(initiate(wb))]
+		[Translate(.51,-0.1,2.2) RL(-90) RU(45) RL(-20) Leaf.(initiate(wb))]
+		
+		*/
+	]
+	
+	;
+	
+]
+
+
+public static void scenePottedPlants()
+[
+	{
+		//System.gc(); // makes only sense if multiple loops, also better at the end
+		//initData();
+		clearConsole();
+		//disableView3DRepaint();
+		//enableView3DRepaint();
+		//Random rInst = new Random();
+		//rInst.setSeed(10000);
+		if(fixedSeed == false){ // !=fixedSeed
+			seed = (long) random(0,1000000); 
+			//println("Seed: " + seed);
+		}
+		else{
+			seed = 123164;//219007;//595419;
+			//println("Seed: " + seed);
+		}
+		setSeed(seed);
+		//filesExist = false;
+		loadWeatherData(year);
+		loadParameters();
+		dayOfYear = 1;//budBurst -15;//(int) pars[0] - 15;
+		if(dayOfYearSetManually) {
+			dayOfYear = startAtThisDayOfYear;
+		}
+		// for Henke light model
+		//hourOfDay = 0;
+		avHeight = 0;
+		countBend = 0;
+		numberOfPlants = numberOfRows * plantsPerRow;
+		int plantNumber = 0;
+		isPruned == false;
+		
+		if(readSettings) {
+			readSettingsFromFile();
+		}
+		// think it through if necesseary here after testing
+		// not enough info here: where is it used? How?
+		InitiateAvoidMechanism(numberOfRays, openWidthAngle, openHightAngle, predictedLength);
+	}
+	
+	Axiom ==>  
+	//[F]
+	//[ M(-0.05) Cylinder(0.000001,Math.sqrt(1/Math.PI))]
+	//[F(4,0.5)]
+	//[[LightSensor(0.2)] Translate(1,0,0) [LightSensor(0.2)]]
+	
+	//[M(0.7) RU(-90) M(0.8) RU(90) RH(90) Box(1,2, 0.1).(setShader(new RGBAShader(0, 0, 0, 0)))]
+//	[M(-0.3) Internode.(initiateFromBud(b, 0.01, 0.005, b[order]+1, b[rank]+1))]
+	
+
+	[
+		//AdjustLU RL(90) RU(-45) RH(304.06238) RU(-2.61796688496331) F(10,0.5)
+	]
+	//[Translate(0,-3,-1) TextLabel("Day: " + dayOfYear).(setColor(new Color3f(0,0,0)))] 
+	//[RL(90) M(-2.5) Box(5,5,0.1)]
+	//[globalXAxis(2)]
+	//[globalYAxis(2)]
+	//[globalZAxis(2)]
+	
+	// middle sensor 1m²
+	//[Translate(0.5,0,2.05) RU(-90) ITile.(setGeometry(1,1))] //5.1,5.1
+	
+	//[Ground.(setGeometry(30,30))]
+	
+	if(compass)(
+		[RH(rowOrientation) Translate(0,0,-1) compass(1.5)]
+	)
+
+	if(light) (		
+		[df:DiffuseLightOfSky]
+		[dr:DirectLightOfSun]
+		if(longwaveOn) (
+			[dfLLSKY:DiffuseLongwaveLightOfSky]
+			[dfLLGROUND:DiffuseLongwaveLightOfGround]
+			{
+				dfLLSKY.initiate(10);
+				dfLLGROUND.initiate(10);
+			}
+		)
+		
+		   {
+			//createFileForIncomingLight();
+			//computeLightPowerAndSunAngles(); // init with 0 as NA
+			df.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			//df.setSkyDome();
+			dr.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			//dr.setDailySunArc(); // here not working, also not necessary, first day simulation initiates arc
+		/*	if(hourlyModeOn) {
+				// TODO: void method funktioniert hier nicht
+				// 0 ist falsche Position im Array, weil Westen am Anfang: rückwärds
+				updateOnHourSunAndDomePowerAndPosition(0); // init with first on hour sunshine
+				//dr.updatePositionAndPowerHourly(hour);
+				//dr.setHourlySunPosition(hour); // OnHour
+		
+			}
+			else {
+				// das hier ist der Unterschied zu ViRi1: void method funktioniert hier
+				// nicht. Aber unteres sollte jetzt funktionieren- wo ist der dome??
+
+				updateDailySunAndDomePowerAndPosition();
+				// TODO: where is sun arc? Should be initialized
+				//repaintView3D();
+			}
+			*/
+			
+			/*	
+			df.initiate(10);
+			df.update(); 
+			dr.initiate(10);
+			dr.update();
+			*/
+		}
+		
+		{
+			//run_hourly_mode(); // do I need the sun at init state?
+		}
+	)
+	
+	for(int row = 0; row < numberOfRows; row++)(
+	[		
+		RH(180)
+		//Translate(RowDistance[row], 0, 0)
+		Translate((rowSpacing * row) - ((rowSpacing * numberOfRows) / 2) + (rowSpacing/2), 0, 0)	
+		//Translate(0, (4.5 * row) - ((4.5 * Rows) / 2) + 2.75, 0)	// rowSpacing = row distance
+	/*	[M(plantSpacing) // height
+		RL(-90) 
+		for(int i = 1; i<=9; i++) ( // i = (distance/numberOfSensores) + 1
+		ITile.(initiate()) M(0.5)	// M = (distance/numberOfSensores)	//Sphere(0.02)
+		)
+		]
+		//ITile
+	*/
+		// posts (direction along y-axis)
+		for(int p = 0; p < numberOfRowSegments+1; p++)(
+			//[Translate(0, 4.5 -(4.5 * p), 0) Post(lengthPost, widthPost)]
+			[
+				Translate(0, (distPost*numberOfRowSegments)/2, 0) 
+				Translate(0, (-distPost*(p)), 0) Post(lengthPost, widthPost)
+				if(p==0) (
+					[RL(90) Plank(distPost, 0.28, 0.045)]
+				)
+			]
+		)
+		// marker
+		
+		//[Translate(0, 4.5, 0) M(2.3) RL(90) Wire(4.5 * (posts-1), 0.01).(setShader(RED))]
+		//[Translate(0, 2, 0) M(1) Sphere(0.06).(setShader(RED))]
+		//[Translate(0, 2, 0) M(WireHeights[1]) Sphere(0.06).(setShader(RED))]
+		//[Translate(0, 2, 0) M(WireHeights[2]) Sphere(0.06).(setShader(RED))]
+		//[Translate(0, 2, 0) M(WireHeights[3]) Sphere(0.06).(setShader(RED))]
+		//[Translate(0, 2, 0) M(WireHeights[4]) Sphere(0.06).(setShader(RED))]
+		
+		// side growth marker
+		//[Translate(-0.1, (distPost*NumberOfRowSegments)/2, 0) M(WireHeights[0]) RL(90) F(distPost * (NumberOfRowSegments), 0.01, row)]
+		//[Translate(0.1, (distPost*NumberOfRowSegments)/2, 0) M(WireHeights[0]) RL(90) F(distPost * (NumberOfRowSegments), 0.01, row)]
+		
+		
+		 // lower wire (cane)
+		//[Translate(0, (distPost*numberOfRowSegments)/2, 0) M(WireHeights[0]) RL(90) TrunkWire(distPost * (numberOfRowSegments), 0.01, row)]
+		[Translate(0.15, ((distPost*numberOfRowSegments)/2), 0) M(WireHeights[0]) RL(90) RH(90) Foil(distPost * (numberOfRowSegments), 0.3, 0.005)]
+		[Translate(-0.15, ((distPost*numberOfRowSegments)/2), 0) M(WireHeights[0]) RL(90) RH(90) Foil(distPost * (numberOfRowSegments), 0.3, 0.005)]
+
+		// main stem with 12 ranks
+		
+		for(int p = 0; p < plantsPerRow; p++)(
+			//{plantNumber++;}		
+		[		
+			
+			//Translate(0, rowSpacing - plantSpacing * (p+1), 0) 
+			Translate(0, (distPost*numberOfRowSegments)/2+(plantSpacing-0.2) - plantSpacing * (p+1), 0)
+			M(0.55+0.045)
+			// pots:
+			F(0.25,0.3).(setShader(new RGBAShader(0, 0, 0, 0) )) // FullAbsorbanceShader
+			tr:Trunk(0.0001, 0.29, plantNumber)
+			//RL(90)
+
+			
+			for(int r = 1; r <= 5; r++)(		
+				
+				 RL(random(0.5, -0.5)) CaneSegment(
+				// 1000 just a very high THT sum to achieve max growth
+				primIntGrowth(1000, r), 0.02, 0, r, 0, r).(setShader(
+				transOn?new RGBAShader(0, 0, 0, 0):new RGBAShader(0.6, 0.3, 0))) 
+				//new RGBAShader(0,0,0,0)))
+		
+				if(r == 4 || r == 5)(	//	r != 2 && r != 4
+					[M( -primIntGrowth(1000, r) / 10)
+					RL(-90) M(0.01) RL(90) 
+					RL(-45) // exactly as axillary buds on primary shoots
+					{ 
+						float ApexInitialAngleProbability = random(0.0,100.0);
+					}
+					if(ApexInitialAngleProbability > 50.0) (
+						//RH(random(170, 190))			
+					)
+					else (
+						//RH(random(-10,10))
+					)	 
+					// Model starts development here!
+					//{println("HERE: " + plantNumber);}
+					// wb probably not in use
+					
+					wb:WinterBud.(initiate(0 + 1, 0, 86, r, row, tr.number)) //, random(0.0,1.0)>=0.7058824?3:4)
+					]
+				) 
+				
+				RH(180) // alternating with variability			
+			)
+		]     
+		{plantNumber++;}		
+		)
+	]
+	);
+]
+
+
+public static void Scene_Sensores()
+[
+	{
+		dayOfYear = budBurst -5;
+	}
+	Axiom ==> 
+//	[M(-0.3) Internode.(initiateFromBud(b, 0.01, 0.005, b[order]+1, b[rank]+1))]
+	//[Translate(0,0,-3) compass(1.5)]
+	//[globalXAxis(2)]
+	//[globalYAxis(2)]
+	//[globalZAxis(2)]
+	
+	if(light) (		
+		[df:DiffuseLightOfSky]
+		[dr:DirectLightOfSun]
+		/* //out if not Evers light model on
+		{
+			computeLightPowerAndSunAngles();
+			df.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			df.updatePowerDaily(); 
+			dr.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			dr.updatePositionAndPowerDaily();
+		}*/
+		
+		{
+			//run_hourly_mode();
+		}
+	)
+	{float square_pars = 1;}
+	[M(-1.3) Translate(1,0,0) RU(90) M(-square_pars/2) ITile.(initiate(0), setGeometry(square_pars, square_pars))]
+	[M(0.0) RU(145) SingleLight(1)]
+	
+	{
+		
+	}
+	
+	;
+]
+
+public static void Scene_UpwardsTrend (float angle)
+[
+	{
+		clearConsole();
+	}
+	Axiom ==> 
+	[RL(90)  M(-1) Box(2,2,0.01).(setShader(RED))]
+	wb:WinterBud.(initiate(0 + 1, rank = 10, 111, 1, 0, 0)) //Sphere(0.1)
+	
+	RU(90) RU(angle)
+	TestSegment.(initiate(wb)) 
+	wb2:WinterBud.(initiate(0 + 1, rank = 10, 111, 1, 0, 0))
+	wb2.(setName("wb2")) 
+	;
+]
+/*
+public static void Scene_UpwardsTend_computeStrength()
+[
+	{
+		float strength;
+	}
+	ts:TestSegment ::>	{
+		strength = computeUpwardsTrend(ts);
+		println("Strength: " + strength);
+	}
+	
+	(* wb2:WinterBud, (wb2.getName() == "wb2") *), wb2 ==>
+	RPGeisenheim(new Point3d(wb2.x, wb2.y, wb2.z + 10), strength)
+	TestSegment.(initiate(wb2));
+]
+*/
+
+
+// niu: marker would not be drawn
+public static void Scene_Marker ()
+[
+	==>^ 
+	[Translate(0, 4.5, 0) M(2.3) RL(90) Wire(4.5 * (numberOfRowSegments), 0.01).(setShader(RED))]
+	;
+]
+
+public static void Scene_LeafOrientation ()
+[
+	Axiom ==> [F(4)]
+	
+
+	wb:WinterBud.(initiate(0 + 1, 0, 111, 1, 0, 0))
+	//Leaf.(initiate(wb))
+	RL(45) RU(45)
+	F.(setShader(RED))	
+	[RU(-45) //ok
+	AdjustLU //ok
+	
+	// these 40 have to be applied to put the petiole into the right angle
+	RG RL(-90 - 40 )  // get direction of turtle here!
+	F	
+	RH(180) //ok
+	// those 40 have to be applied to put the leaf horizontally
+	// those 40 come from the petiole angle
+	RL(-40)//RL(- pars[29 + 1]) // RL() to rotate leaf into horizontal 
+	JMidrib(0) 
+	Leaf.(initiate(wb))] 
+	
+	;
+]
+
+
+public static void setSensorLinesOLD(int firstRow, int lastRow) {
+	[
+		==>^
+			// go to bunch zone height
+			M(0.7) 
+			
+			for(int row = firstRow-1; row <= lastRow-1; row++)(
+				[
+				RH(180)
+				//Translate(RowDistance[row], 0, 0)
+				Translate((1.8 * row) - ((1.8 * numberOfRows) / 2) + 0.9, 0, 0)	
+				
+				// along row (y-axis)
+				for(int p = 0; p < numberOfRowSegments; p++)(
+				[
+					//				
+					// go to next post
+					Translate(0, 2.25*numberOfRowSegments -(4.5 * p) - 0.05, 0)//
+					
+					// three sensor lines in three heights
+					for(int h = 0; h<4; h++) (
+						RL(90)
+						for(int i = 1; i<=44; i++) (
+							ITile.(initiate(row+1)) M(0.1)
+						)
+						M(-4.4)
+						RL(-90)
+						M(0.1)
+					)
+					M(-0.3)
+					RL(90)
+					M(4.45)
+					RL(-90)
+				]
+				)
+				]
+			)
+			//RL(90)
+			//M(-0.05)
+			;			
+		]
+		
+}

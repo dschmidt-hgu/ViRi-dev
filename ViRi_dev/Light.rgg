@@ -1,0 +1,589 @@
+
+import static Globals.*;
+import static modules_light.*;
+
+import static main_Develop.*; 
+import static input_output.*;
+import static methods_simulation.*;
+import static main_Develop.*;
+                               
+// Parameters
+
+// light model options
+static double fractionPAR = 0.47; //Ponce de Leon 2021
+static double fractionNIR = 0.53; //Ponce de Leon 2021
+static int depth				= 3;				// maximum number of reflections / transmissions of a ray
+//static LightModel lm			= new LightModel(20000000, depth);//2000000
+static int num_light_rays = 2000000000;//2000000000;
+static FluxLightModel lm		= new FluxLightModel(num_light_rays, depth).(setRandomSeed(123)); //20000000 //500000000  // 3956125 22225041
+static boolean seeRays			= false;		// see direction of rays from light sources if true
+static int nrClones				= 10;//plantsPerRow*numberOfRows;			// number of cloned canopies in x and y direction
+
+// Leaves
+
+static double reflectancePAR		= 0.14;		// reflectance of PAR by leaves and stem
+static double transmittancePAR		= 0.15;		// transmittance of PAR by leaves
+static double reflectanceNIR 		= 0.4455; // Ponce de Leon 2021
+static double transmittanceNIR 		= 0.4041; // Ponce de Leon 2021
+/*
+static double reflectanceRed		= 0.07;		// reflectance of red light by leaves and stem
+static double transmittanceRed		= 0.09;		// transmittance of red light by leaves
+static double reflectanceFarRed		 = 0.45;	// reflectance of far-red light by leaves and stem
+static double transmittanceFarRed	= 0.46;		// transmittance of far-red light by leaves
+*/
+// Berries
+static double berryReflectancePAR		= 0.1341119;//0.1407404;//0.1341119;//0.1407404;	// 0.8;//	
+static double berryTransmittancePAR		= 0.1938704;//0.1966268;//0.1938704;//0.1966268;
+static double berryReflectanceNIR 		= 0.2543; // Ponce de Leon 2021
+static double berryTransmittanceNIR 		= 0.0; // Ponce de Leon 2021
+/*
+static double berryReflectanceRed		= 0.1189733;		
+static double berryTransmittanceRed		= 0.1224216;		
+static double berryReflectanceFarRed	= 0.2219625;	
+static double berryTransmittanceFarRed	= 0.5197597;		
+*/
+// environmental settings
+const float latitude 			= LATITUDE * Math.PI/180;	// the latitude of location of the scene
+
+
+
+// daylength (from Diurnal model by A Morales)
+static double calcDayLength(int doy, double lat) {
+	// Declination angle of the sun due to the fact that Earth's rotation axis is not perpendicular to translation plane
+	double dec = Math.asin(-Math.sin(23.45*Math.PI/180.0)*Math.cos(2.0*Math.PI*(doy + 10.0)/365.0));
+	// Calculate sunset angle with respect to solar non
+	double cosSunset = -Math.tan(lat)*Math.tan(dec);
+	double sunset = cosSunset > 1 ? 0 : (cosSunset < -1 ? Math.PI : Math.acos(cosSunset));
+
+	// Length of the day (sunrise - sunset) in hours
+	return 2.0*sunset/Math.PI*12;
+}
+
+// setup of light sources (45, 90)
+const float ToRadians					= Math.PI/180;		// conversion factor degrees to radians
+const float ToDegree					= 180/Math.PI;		// conversion factor radians to degrees
+const float Transmissivity				= 0.5969628;//.3736;//0.3733504; // optimization Geisenheim measurements vs. ViRi Model 
+const float FractionDiffuseLightDaily	= 0.2272819;//.5409;//0.5412664; // optimization Geisenheim measurements vs. ViRi Model  //clear sky?
+const float tilt						= 23.45*ToRadians;	// tilt of the earth axis
+const float c							= 0.4; 				// parameter for collecting radiation transition related with elevation angle Spitter 1986
+static int n							= 24;				// number of direct light sources during the day
+static double cm				= 1 + 1 + 1; // full spectrum
+
+// Chris
+// n and array to be initialized according to daily or hourly mode in m_simualtions!?
+static int numberOfSimulationHours;	// computed and initialized in methods_simulation
+static float[][] betaAzimSdr			= new float[3][];	// row 1 solar elevation beta; row 2 solar azimuth; and row 3 direct light
+// Chris TODO see above
+static float[][] solarData			= new float[7][];	//beta, azimuth, directLight, diffuseLight, time, totalExtraterrestrialRadiation, timeInterval
+static float timeSunRise;
+static float timeSunSet;
+
+static float DailyDiffuseRadiation;
+static float OnHourDiffuseRadiation;
+static float globalRadiationIntensity;			// total incoming radiation from all directions at the horizontal plane
+static float PPFD;								// photosynthetic photon flux density in umol/m2/s
+static double dayLength;						// hours of daylight
+
+static void computeLightPowerAndSunAngles() {
+	if(hourlyModeOn) {		
+		dayLength = calcDayLength(dayOfYear, latitude);
+		timeSunRise = 12 - dayLength/2.0; //--> tsr  
+		println("DOY: " + dayOfYear);
+		println("Sunrise: " + timeSunRise);
+		//println("timeSunRise+dayLength : " + (timeSunRise+dayLength));
+		timeSunSet = 12 + dayLength/2.0; // TODO: compare to line 58
+		println("Sunset: " + timeSunSet);
+
+		solarData = getIntervalRadiation(dayOfYear, latitude, n);
+		
+		/*numberOfSimulationHours = getNumberOfSimulationHours();
+		n = numberOfSimulationHours;
+		solarData = getRadiationOfSimulationHours(dayOfYear, latitude); */
+		float sumPPFD = 0;
+		
+		
+		println(" ");
+		globalRadiationIntensity = solarData[2][n]; // before beta.. 0.7*
+		println("PPFD: " + 1e6 * 0.55 * 4.55 * globalRadiationIntensity / (dayLength*60*60));
+		println("sumPPFD/24: " + (sumPPFD/n));
+		
+		//println("DailyDiffuseFromHourly [W/h/m2/OnHourPeriod]: " + (sumDiffuse));
+		
+		float sumDirect = 0;
+		for(int j = 0; j <= n-1; j++) {
+			//println("diff on hour: " + solarData[3][j]);
+			//sumDirect = sumDirect + (1e6 * 0.55 * solarData[2][j] / (60*60)); // removed dayLength, now per hour //  * 4.55 
+			sumDirect = sumDirect + (solarData[2][j]); // removed dayLength, now per hour //  * 4.55 
+
+		}
+		//println("DailyDirectFromHourly [W/h/m2/OnHourPeriod]: " + (sumDirect));/**/
+	}
+	else {
+		dayLength = calcDayLength(dayOfYear, latitude);
+		betaAzimSdr = getDailyRadiation(dayOfYear, latitude, n);
+		globalRadiationIntensity = betaAzimSdr[2][n] ; // before beta.. 0.7*
+		PPFD = 1e6 * fractionPAR * 4.55 * globalRadiationIntensity / (dayLength*60*60);
+		println("FullSpectrum: " + (1e6 * globalRadiationIntensity / (dayLength*60*60)) + "umol/m2/s");
+		DailyDiffuseRadiation = betaAzimSdr[2][n+1]; // before beta.. 0.7*
+		//println("DailyDiffuse [W/h/m2/day]: " + (1e6 * 0.55 * DailyDiffuseRadiation / (dayLength*60*60)));
+		//println("1DailyDiffuse: " + (DailyDiffuseRadiation));
+		
+		float sumDirect = 0;
+		for(int j = 0; j <= n-1; j++) {
+			//println("diff on hour: " + betaAzimSdr[2][j]);
+			//sumDirect = sumDirect + (1e6 * 0.55 * betaAzimSdr[2][j]  / (dayLength*60*60)); 
+			sumDirect = sumDirect + (betaAzimSdr[2][j]);
+		}
+		//println("1DirectDailyForSun (no Evers correct) [W/h/m2/day]: " + sumDirect);				
+	}
+
+}
+
+// solar azimuth angle
+static float[][] getDailyRadiation(int dayOfYear, float latitude, int n) {
+	//daily parameters // Math.cos(2*Math.PI*(time-12)/24f);
+    float eccentricity =  1+0.033*Math.cos(2*Math.PI*(dayOfYear-10)/365);  // the position of the earth during the year
+	float sinDelta = -Math.sin(tilt) * Math.cos(2*Math.PI*(dayOfYear+10)/365); 
+	float cosDelta = Math.sqrt(1-(sinDelta)**2);  //delta is the declination of the sun with respect to the earth equator
+	float a = Math.sin(latitude)*sinDelta;  // the season-dependent solar shift with respect to the equator
+	float b = Math.cos(latitude)*cosDelta;  // the season-dependent amlitude of tthe sine of solar height
+	float dayLength = 12 *(1+(2/Math.PI)*Math.asin(a/b));
+	//println("dayLength: " + dayLength);
+	float tsr = 12 - dayLength/2;			// time of sun rise; C: dayLength in hours#
+	float IntegralOfDailySinBeta = 3600*(dayLength*(a + c *(a**2 + 0.5 * b**2)) + //IntegralOfDailySunCourse
+			12/Math.PI * b*(2+ 3 * c *a)* Math.sqrt(1 - a**2 / b**2));   // daily integral of sinbeat take account of the transmission at different angle
+			
+	float DailyExtraTerrestrialRadiation = 1367 * eccentricity * IntegralOfDailySinBeta/ 1e6; //Daily extraterrestrial solar
+	float DailyDiffuseRadiation = FractionDiffuseLightDaily * Transmissivity  * DailyExtraTerrestrialRadiation;
+	//println("DailyDiffuseRadiation: " + DailyDiffuseRadiation);
+	float DailyDirectRadiation =  (1-FractionDiffuseLightDaily) * Transmissivity  * DailyExtraTerrestrialRadiation;
+	//println("DailyDirectRadiation: " + DailyDirectRadiation);
+	
+	
+	
+	// hourly parameters
+	timeInterval = dayLength / n * 3600; //(n-1) * 3600; // Time interval in seconds
+	float[] hourAngle = new float[n];
+	float[] beta = new float[n];
+	float Sg = 0;  // instantaneous light intensity
+	float S0 = 1367 * eccentricity/ 1e6;  //instant External radiation
+	float S0d = 0;
+	float[][] betaAzimSdr = new float[3][];  // row 0 beta; row 1 azimuth; and row 3 direct light in one array
+	betaAzimSdr[0] = new float[n];
+	betaAzimSdr[1] = new float[n];
+	betaAzimSdr[2] = new float[n+2]; // add daily total radiation MJ/m2, daily total at horzontal plane and daily diffuse light
+	float sumtimeInterval = 0;
+	//float withAngleCor = 0;
+	//float sumUpLight = 0;
+
+	for (int j = 0; j <= n-1; j++) {
+		sumtimeInterval = sumtimeInterval+timeInterval;
+
+		// sunrise to sunset. But here sunset excluded!!
+		//hourAngle[j] = 2 * Math.PI *(tsr + j*timeInterval/3600 - 12)/24;
+		hourAngle[j] = 2 * Math.PI *(tsr + (j+0.5)*timeInterval/3600 - 12)/24;
+		beta[j] = Math.asin(a + b * Math.cos(hourAngle[j]));
+		betaAzimSdr[0][j] = ToDegree * beta[j]; // beta in degree
+		if (betaAzimSdr[0][j] < 0) {betaAzimSdr[2][j] = 0;}  // make the morning and afternoon points symetric
+		//azimuth
+		betaAzimSdr[1][j] = ToDegree * Math.acos( Math.min(1.0, (Math.sin(beta[j]) * Math.sin(latitude) - sinDelta)
+							/( Math.cos(beta[j]) * Math.cos(latitude)))); // azimuth in degree
+		betaAzimSdr[1][j] = (hourAngle[j] > 0)? (180+ betaAzimSdr[1][j])%360
+							:(3* 180 - betaAzimSdr[1][j])%360;
+		if(hourAngle[j]==0) {betaAzimSdr[1][j] = betaAzimSdr[1][j-1] > 90 ? 180:0;};
+		//direct light at perpendicular direction, since the light model can account for the solar elevation angle
+		// Chris: integral has to do with the sun course on the day, and this course is simulated by the sun in the model, hence not needed in the calculation --> /Integral..
+		Sg = (1+ c * Math.sin(beta[j])) * Transmissivity * DailyExtraTerrestrialRadiation / IntegralOfDailySinBeta;   // NOT USE: Math.sin(beta[j])* 
+		//println("Sg/rex: " + (Sg*timeInterval)/(DailyExtraTerrestrialRadiation * Transmissivity));
+		//println("sg: " + (Sg*timeInterval));
+		
+		//withAngleCor = Sg * Math.sin(beta[j]);
+		//sumUpLight = sumUpLight + (withAngleCor * (1- FractionDiffuseLightDaily) * timeInterval);
+		betaAzimSdr[2][j] = (1- FractionDiffuseLightDaily) * Sg * timeInterval; // Direct radiation integrated over delt in MJ/m2
+		//sumUpLight = sumUpLight + betaAzimSdr[2][j];
+		//println("Angle: " + (beta[j]*180/Math.PI));
+		//println("Azi: " + j + ": " + betaAzimSdr[1][j]);
+		//println("AngleRAD: " + betaAzimSdr[0][j]);
+	}
+	 betaAzimSdr[2][n] =  DailyExtraTerrestrialRadiation * Transmissivity; 	 // add daily total radiation at horizontal plane MJ/m2
+	 betaAzimSdr[2][n+1] =  DailyDiffuseRadiation; 				// add daily diffuse radiation MJ/m2
+	// sumUpLight = sumUpLight + DailyDiffuseRadiation;
+	 //println("TotalLight emitted: " + (1e6 * 0.55 * 4.55 *sumUpLight / (dayLength*60*60)) );
+	 //println("TotalLight emitted: " + (1e6 * 0.55 * 4.55 *(DailyDiffuseRadiation+DailyDirectRadiation) / (dayLength*60*60)) );
+	 //println("Global: " + betaAzimSdr[2][n]);
+	 //println("DDR: " + betaAzimSdr[2][n+1]);
+	 
+	 
+	timeSunRise = 12 - dayLength/2; //--> tsr  
+	//println("Sunrise: " + timeSunRise);
+	//println("timeSunRise+dayLength : " + (timeSunRise+dayLength));
+	timeSunSet = 12 + dayLength/2; // TODO: compare to line 58
+	//println("Sunset: " + timeSunSet);
+	 
+	//println("diff: " + (timeSunSet-timeSunRise)); 
+	//println("sumtimeInterval: "+sumtimeInterval/3600);
+	return betaAzimSdr;
+}
+
+// solar azimuth angle
+static float[][] getIntervalRadiation(int dayOfYear, float latitude, int n) {
+	//daily parameters // Math.cos(2*Math.PI*(time-12)/24f);
+    float eccentricity =  1+0.033*Math.cos(2*Math.PI*(dayOfYear-10)/365);  // the position of the earth during the year
+	float sinDelta = -Math.sin(tilt) * Math.cos(2*Math.PI*(dayOfYear+10)/365); 
+	float cosDelta = Math.sqrt(1-(sinDelta)**2);  //delta is the declination of the sun with respect to the earth equator
+	float a = Math.sin(latitude)*sinDelta;  // the season-dependent solar shift with respect to the equator
+	float b = Math.cos(latitude)*cosDelta;  // the season-dependent amlitude of tthe sine of solar height
+	float dayLength = 12 *(1+(2/Math.PI)*Math.asin(a/b));
+	//println("dayLength: " + dayLength);
+	float tsr = 12 - dayLength/2;			// time of sun rise; C: dayLength in hours#
+	float IntegralOfDailySinBeta = 3600*(dayLength*(a + c *(a**2 + 0.5 * b**2)) + //IntegralOfDailySunCourse
+			12/Math.PI * b*(2+ 3 * c *a)* Math.sqrt(1 - a**2 / b**2));   // daily integral of sinbeat take account of the transmission at different angle
+			
+	float DailyExtraTerrestrialRadiation = 1367 * eccentricity * IntegralOfDailySinBeta/ 1e6; //Daily extraterrestrial solar
+	float DailyDiffuseRadiation = FractionDiffuseLightDaily * Transmissivity  * DailyExtraTerrestrialRadiation;
+	//println("HERE DailyDiffuseRadiation: " + (DailyDiffuseRadiation*1e6));
+	float DailyDirectRadiation =  (1-FractionDiffuseLightDaily) * Transmissivity  * DailyExtraTerrestrialRadiation;
+	//println("HERE DailyDirectRadiation: " + (DailyDirectRadiation*1e6));
+	
+	//n=24;
+	
+	// hourly parameters
+	timeInterval = dayLength / n * 3600; //(n-1) * 3600; // Time interval in seconds
+	//println("timeInterval: " + timeInterval);
+	float[] hourAngle = new float[n];
+	float[] beta = new float[n];
+	float Sg = 0;  // instantaneous light intensity
+	float Sg_withAngleCorrection = 0;  
+	float S0 = 1367 * eccentricity/ 1e6;  //instant External radiation
+	float S0d = 0;
+
+	solarData[0] = new float[n];
+	solarData[1] = new float[n];
+	solarData[2] = new float[n+2]; // add daily total radiation MJ/m2, daily total at horizontal plane
+	solarData[3] = new float[n]; //Chris: add hourly diffuse radiation 
+	solarData[4] = new float[n]; //Chris: add hour
+	solarData[5] = new float[n]; //Chris: add hourly extraterestrial radiation
+	solarData[6] = new float[n]; //Chris: timeinterval
+	//solarData[7] = new float[n]; //Chris: daily direct radiation
+		
+
+	float sumtimeInterval = 0;
+	float directLightWithAngleCorrection;
+
+	for (int j = 0; j <= n-1; j++) {
+		sumtimeInterval = sumtimeInterval+timeInterval;
+		// sunrise to sunset. But here sunset excluded!!
+		//hourAngle[j] = 2 * Math.PI *(tsr + j*timeInterval/3600 - 12)/24;
+		hourAngle[j] = 2 * Math.PI *(tsr + (j+0.5)*timeInterval/3600 - 12)/24;
+		beta[j] = Math.asin(a + b * Math.cos(hourAngle[j]));
+		//println("j: "+j);
+	
+		solarData[0][j] = ToDegree * beta[j]; // beta in degree
+		//println(solarData[0][j]);
+		
+		if (solarData[0][j] < 0) {solarData[2][j] = 0;}  // make the morning and afternoon points symmetric
+		//azimuth
+		solarData[1][j] = ToDegree * Math.acos( Math.min(1.0, (Math.sin(beta[j]) * Math.sin(latitude) - sinDelta)
+							/( Math.cos(beta[j]) * Math.cos(latitude)))); // azimuth in degree
+		solarData[1][j] = (hourAngle[j] > 0)? (180+ solarData[1][j])%360
+							:(3* 180 - solarData[1][j])%360;
+		if(hourAngle[j]==0) {solarData[1][j] = solarData[1][j-1] > 90 ? 180:0;};
+		//direct light at perpendicular direction, since the light model can account for the solar elevation angle
+		// Chris: integral has to do with the sun course on the day, and this course is simulated by the sun in the model, hence not needed in the calculation --> /Integral..
+		Sg = (1+ c * Math.sin(beta[j])) * Transmissivity * DailyExtraTerrestrialRadiation / IntegralOfDailySinBeta;   // NOT USE: Math.sin(beta[j])* 
+		//println("Sg/rex: " + (Sg*timeInterval)/(DailyExtraTerrestrialRadiation * Transmissivity));
+		//println("sg: " + (Sg*timeInterval));
+		solarData[2][j] = (1- FractionDiffuseLightDaily) * Sg * timeInterval; // Direct radiation integrated over delt in MJ/m2
+		//println("solarData[2][j]: " + solarData[2][j]);
+		// probably all angles redundant
+		Sg_withAngleCorrection = Math.sin(beta[j])*  (1+ c * Math.sin(beta[j])) * Transmissivity * DailyExtraTerrestrialRadiation / IntegralOfDailySinBeta;  
+		solarData[3][j] = (FractionDiffuseLightDaily * Sg_withAngleCorrection * timeInterval); // 3600// * Transmissivity; // Math.sin(beta[j])*
+		solarData[4][j] = tsr + (j+0.5)*timeInterval/3600;//tsr + (j+0.5)*timeInterval/3600;
+								
+		
+		directLightWithAngleCorrection = Sg_withAngleCorrection * (1- FractionDiffuseLightDaily) * timeInterval;
+		// sum direct and diffuse radiation, no angle correction, hence too much!? // 
+		solarData[5][j] = directLightWithAngleCorrection + solarData[3][j]; 
+		// time interval
+		solarData[6][j] = timeInterval;
+		//println("HERE: " + (hourAngle[j]*180/Math.PI));
+		//println("solarData[4][j]: " + solarData[4][j]);
+		/*
+		println(" ");
+		println("Direct: " + directLightWithAngleCorrection);
+		println("Diffuse: " + solarData[3][j]);
+		
+*/
+	}
+	 solarData[2][n] =  DailyExtraTerrestrialRadiation * Transmissivity; 	 // add daily total radiation at horizontal plane MJ/m2
+	 solarData[2][n+1] =  DailyDiffuseRadiation; 				// add daily diffuse radiation MJ/m2
+
+	return solarData;
+}
+
+
+public static void updateDailySunAndDomePowerAndPosition() {
+[
+	// update light sources
+	dr:DirectLightOfSun ::>
+	{
+		dr.updatePositionAndPowerDaily();
+		// Why is it disappearing, actually this would draw it again and again (what is wrong)
+		dr.setDailySunArc();
+		//println("Sun updated P: " + dr.power);
+	}
+	df:DiffuseLightOfSky ::>
+	{
+		df.updatePowerDaily();
+		df.setSolarRadiationSkyDome();
+		//println(df[power]);
+	}
+]  
+	
+}
+
+public static void updateOnMinuteSunAndDomePowerAndPosition(int minute) {
+
+		[			
+			// TODO: can't work since light does not exist
+			// TODO: sun has to be erased for hourly mode!
+			// update light sources
+			dr:DirectLightOfSun ::>
+			{
+				
+				dr.updatePositionAndPowerHourly(minute);
+				dr.setHourlySunPosition(minute); // OnHour
+				//repaintView3D();
+				//println("HourOfDayDirect [umol/m2/s]: " + hourOfDay +
+				//": " + dr.power[hour]);	//TODO: check hours, power
+				
+				//println("Sun updated P: " + dr.power);
+			}			
+			
+			df:DiffuseLightOfSky ::>
+			{
+				// TODO: random hourly positions 
+				df.updatePowerHourly(minute);
+				df.setSolarRadiationSkyDome();
+				
+				//println("HourOfDayDiffuse [W/m2]: " + hourOfDay +
+				//": " + df.power[hour]);	//TODO: check hours, power
+				//": " + 1e6 * 0.55 * solarData[3][hour] / (dayLength*60*60));
+				
+				
+		
+				//println(df[power]);
+			}
+		]  
+}
+
+public static void updateOnMinuteLongwaveSkyDomePowerAndPosition(int doy, int hour, int minute) {
+
+		[	
+			dfLLSKY:DiffuseLongwaveLightOfSky ::>
+			{
+				// TODO: random hourly positions 
+				dfLLSKY.updateLongwavePowerHourly(doy, hour, minute);
+				dfLLSKY.setLongwaveSkyDome();
+				
+				//println("HourOfDayDiffuse [W/m2]: " + hourOfDay +
+				//": " + df.power[hour]);	//TODO: check hours, power
+				//": " + 1e6 * 0.55 * solarData[3][hour] / (dayLength*60*60));
+				
+				
+		
+				//println(df[power]);
+			}
+			
+		]		  
+}
+
+public static void updateOnMinuteLongwaveGroundDomePowerAndPosition(int doy, int hour, int minute) {
+
+		[				
+			dfLLGROUND:DiffuseLongwaveLightOfGround ::>
+			{
+				dfLLGROUND.updateLongwavePowerHourly(doy, hour, minute);
+				dfLLGROUND.setGroundDome();
+			}
+		]		  
+}
+
+
+public static void updateOnHourLongwaveSkyAndGroundDomePowerAndPosition(int doy, int hour, int minute) {
+
+		[	
+			dfLLSKY:DiffuseLongwaveLightOfSky ::>
+			{
+				// TODO: random hourly positions 
+				dfLLSKY.updateLongwavePowerHourly(doy, hour, minute);
+				dfLLSKY.setLongwaveSkyDome();
+				
+				//println("HourOfDayDiffuse [W/m2]: " + hourOfDay +
+				//": " + df.power[hour]);	//TODO: check hours, power
+				//": " + 1e6 * 0.55 * solarData[3][hour] / (dayLength*60*60));
+				
+				
+		
+				//println(df[power]);
+			}
+			
+			dfLLGROUND:DiffuseLongwaveLightOfGround ::>
+			{
+				dfLLGROUND.updateLongwavePowerHourly(doy, hour, minute);
+				dfLLGROUND.setGroundDome();
+			}
+		]		  
+}
+
+
+
+/*
+public static void updateLight()
+[
+	{
+		//createFileForIncomingLight();
+		updateIncomingLight();
+		//printIncomingLight(n, dayOfYear, dayLength, betaAzimSdr);
+		//updateIncomingLight();
+	}
+	// update light sources
+	dr:DirectLightOfSun ::>
+	{
+		dr.update();
+		
+		//println("Sun updated P: " + dr.power);
+	}
+	df:DiffuseLightOfSky ::>
+	{
+		// TODO: if hourlyMode, get hour of array
+		df.update();
+		//println(df[power]);
+	}
+]  
+*/
+//##############################################################################
+//##############################################################################
+//##############################################################################
+/* 
+// taken from Evers model:
+static FluxLightModel lm		= new FluxLightModel(20000000, 10); //20000000
+static double reflectancePAR		= 0.14;		// reflectance of PAR by leaves and stem
+static double transmittancePAR		= 0.15;		// transmittance of PAR by leaves
+static double reflectanceRed		= 0.07;		// reflectance of red light by leaves and stem
+static double transmittanceRed		= 0.09;		// transmittance of red light by leaves
+static double reflectanceFarRed		 = 0.45;	// reflectance of far-red light by leaves and stem
+static double transmittanceFarRed	= 0.46;		// transmittance of far-red light by leaves
+static double rfrIncoming		= 1.2;
+static float PPFD;								// photosynthetic photon flux density in umol/m2/s
+
+// Buck-Sorlin, Henke version
+//All I changed is: 
+//hourofday +1; OUT because currently running in daily mode 
+//and illustrations like labels, tracking sun
+//from Evers I took leaf parameters
+
+
+const float GRtoPPFDDLT = 2.25; //conversion factor radiation to ppfd
+
+const float DISTANCE = 15;		//MH: radius of himisphere and sun 
+const float DIFF_POW = 2000; //total power of diffuse sky
+const float SUN_POW = 1500; 
+
+
+
+//spheres to trac the sun movement
+module SunTracs ==> Sphere(0.25).(setShader(BLUE)); 
+
+//the chart for the output of absorption
+const DatasetRef myChartLINE = new DatasetRef("XY-Line");
+
+
+//function to calculate x,y,z of solar position, instantaneous and daily power, 
+//and day length at any time and day of the year
+//time_h in [0,23], time_min in [0,59]
+public static double[] calcPos(float latitude, int doy, int time) {
+// From a model by Jan Goudriaan, obtained 14.2.2008 
+	float ecc = 0.01671; //eccentricity
+	float ax = 23.438; //angle of Earth axis
+	float daymn1 = 2.0f;
+	float daymn2 = 81.0f;
+	float rad = Math.PI/180f;
+	float corr1 = -4.0*2.0*ecc*Math.sin(2*Math.PI*(doy-daymn1)/365.0f)/rad;
+	float corr2 = (ax*rad)*(ax*rad)*Math.sin(4*Math.PI*(doy-daymn2)/365.0f)/rad;
+	float corr = corr1 + corr2;
+	float corrTime = time + corr;
+	float sinl = Math.sin(rad * latitude); //ok
+	float cosl = Math.cos(rad * latitude); //ok
+	//sine of declination, sine delta:
+	//Chris: aus Spitters
+	float sind = -Math.sin(ax*rad)*Math.cos(2*Math.PI*(doy+10)/365f); //ok
+	//cosine of declination, cosine delta:
+	float cosd = Math.sqrt(1-(sind*sind)); //ok
+	//cosine of hour angle:
+	//float costh = Math.cos(rad*15*(time-12)); //ok
+	float costh = Math.cos(2*Math.PI*(time-12)/24f);
+	//sine of solar height, sine alpha
+	float sina = (sinl * sind) + (cosl * cosd * costh);
+	//solar height alpha
+	//float alpha = Math.asin(sina/rad);
+	//cosine of solar height
+	float cosa = Math.sqrt(1-(sina*sina));
+	//cosine of azimuth, cosine kappa
+	float cosk = (sina * sinl - sind)/(cosa * cosl);
+	//sine of azimuth, sine kappa
+	float sink = Math.sqrt(Math.max(0.000000000001,(1-(cosk*cosk)))) * (((time-12)<0)?-1:1);
+	float x = sink * cosa;
+	float y = sina;
+	float z = cosk * cosa;
+	//instantaneous power:
+	float S = Math.max(0,DIFF_POW * sina); //GBS 100317
+//	float a = sinl * sind;
+//	float b = cosl * cosd;
+//	float eccFac = 1 + 0.0033*Math.cos(2*Math.PI*(doy-10)/365); //eccentricity factor, from GvL, p. 30, eq. 3.1b
+//	float d = 12*(1 + (2/Math.PI)*Math.asin(a/b));//daylength in hours
+	//daily total of S0:
+//	float S0 = a*d+(24*(b/Math.PI))*Math.cos((d/12-1)*(Math.PI/2))*eccFac;
+	//return float result[] = {x,y,z,sina,sink};
+	return double result[] = {x,y,z,S};// ,S0*3600*1367};
+}
+
+
+
+public static void run_hourly_mode() {
+	//hourofday = hourofday +1;
+	
+	if(hourofday==24) {
+		hourofday=0;
+		dayOfYear = dayOfYear +7;
+		//once a day
+		[
+			//remove previous textlabes (by replacing the by nothing)
+			TextLabel ==> ; 
+		]
+	}
+	if(dayOfYear==365) {
+		dayOfYear=0;
+	}
+
+		//update sun&sky
+		[
+			// diffuse
+			dlSky:DiffuseLightOfSky ::> {
+				dlSky.update(hourofday, dayOfYear);
+			}
+			// direct
+			sun:DirectLightOfSun ::> {
+				sun.update(hourofday, dayOfYear);
+			}
+			
+			//tracking the sun positions
+			s:DirectLightOfSun ==> s, ^ 
+				Null(DISTANCE*s.position.x, DISTANCE*s.position.y, DISTANCE*s.position.z) SunTracs 
+				M(0.25) TextLabel(dayOfYear+" "+hourofday).(setColor(new Color3f(1,0,0)));
+		]	
+}
+
+*/
+
+

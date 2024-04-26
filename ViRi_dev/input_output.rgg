@@ -1,0 +1,694 @@
+
+
+import static main_Develop.*; // read year and file
+import static modules_scene.*;
+import static modules_plant.*;
+import static modules_light.*;
+import static Functions.*; // use methods in Riesling
+import static Globals.*; // use methods in Riesling
+//import static methods_simulation.*;
+//import static Light.*;
+//import static plant_related.*;
+//import static management_related.*;
+//import static simulation_related.*;
+
+import java.util.*; //?
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+//import java.util.Date;
+import java.io.BufferedWriter;
+
+
+import java.io.*; // for read csv
+import java.util.ArrayList;	// for read csv
+//import de.grogra.pf.boot.Main;	// for startup-headless-read pars
+
+// this I have not checked what is needed
+import de.grogra.imp3d.Camera;
+import de.grogra.imp3d.View3D;
+import de.grogra.imp3d.ViewConfig3D;
+import de.grogra.imp3d.ray2.Raytracer;
+import de.grogra.imp.IMP;
+import java.io.File;
+
+
+// ### Read and Print
+
+// read from a text file
+static String[][] readTxt(String input)
+{
+	ArrayList data = new ArrayList();
+	
+	File file = new File(input);
+	FileReader reader = new FileReader(file);
+	BufferedReader br = new BufferedReader(reader);
+	
+	// skip the first line with the header
+	String line = br.readLine();
+	
+	// second line - first line with data
+	line = br.readLine();
+	
+	// use , as separator                 
+	String csvSplitBy = ";";
+
+	while (line != null) {
+		//println(line);
+		data.add(line.split(csvSplitBy));
+		
+		line = br.readLine();
+	}
+	
+	return (String[][]) data.toArray(new String[data.size()][]);
+}
+
+
+// print Internode data
+public static void printInt(int trialNumber, PrintWriter InternodesFile, 
+int doy, long seed)
+[
+	{
+		int count = 0;
+	}
+	(* t:Trunk (-->)+ i:Internode, (i[order] > 0, 
+	(print5times5inner?Arrays.asList(6,7,8,11,12,13,16,17,18).contains(t[number]):true)) *) ::>
+	//(* t:Trunk (-->)+ i:Internode, (i[order] > 0) *) ::>
+	{		
+		count++;
+		String ID = i.getId();
+		InternodesFile.println(
+		ID + " " + t[number] + " " + location(t).x + " " + location(t).y +
+		" " + i.rowNumber  + " " + count + " " + i[rankOnParentShoot] + " " 
+		+ i[rankOnCane] + " " 
+		+ i[rank] + " " + i[order] + " " + i[dayOfDevelopment] + " " + i[length]+ " " + 
+		i.x + " " + i.y + " " + i.z + " " + 
+		doy + " " + THT(weatherData, 10, doy, budBurst) + " " + trialNumber 
+		+ " " + processNumber + " " + seed + " " + countBend);
+		InternodesFile.flush();   
+	}
+]
+
+
+
+// print Leaf data (includes petiole of leaf)
+public static void printL(int trialNumber, PrintWriter LeavesFile,
+int doy, float hour, long seed)
+[
+	{
+		int count = 0;
+	}
+
+	(* t:Trunk (-->)+ p:Petiole (-->)+ l:Leaf *) ::>
+	{		
+		count++;
+		String ID = l.getId();
+		LeavesFile.println(
+		ID + " " + t[number] + " " + location(t).x + " " + location(t).y + 
+		" " + l.rowNumber + " " + count + " " + l[rankOnParentShoot] 
+		+ " " + l[rankOnCane] +
+		" " + l[rank] + " " + l[order] + " " + l[dayOfDevelopment] + " " + l[scale]  
+		+ " " + p[length]  + " " + l.x + " " + l.y + " " 
+		+ l.z + " " + doy + " " + hour + " " + THT(weatherData, 10, doy, budBurst) 
+		+ " " + trialNumber + " " + processNumber + " " + seed + " " + l[sx] + " " + l[sy]
+		+ " " + l[sz] + " " + l[area] + " " + l[abs_fullSpec] + 
+		" " + l[abs_fullSpec_m2] + " " + countBend + " " + absorbedLightOfmiddleSquareSensor
+		+ " " + direction(l).x + " " + "NA" + " " + "NA");
+		LeavesFile.flush();   
+	}	
+]
+
+public static void createFileForLeavesDailyData() {
+		String fileName1 = //sdf.format(timestamp)
+		"Leaves_Daily_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + "_" +
+		numberOfRows + "_" + plantsPerRow + ".csv"; //makeTimestamp
+		LeavesFileDailyData = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		LeavesFileDailyData.println(
+		"id" + " " + "plant" + " " + "plant.x" + " " + "plant.y" + 
+		" " + "rowNumber"  + " " + "leaf"+ " " + "rankOnParentShoot"  + " " +
+		"shootOnCane" + " " + "rank" + " " + "order" + " " + "burst" + " " + 
+		"scale" + " " + "petLength"  + " " + "x" + " " + "y" + " " + "z" + 
+		" " + "dayOfYear"  + " " + "thtSum" + " " + "guiSim" + " " + "headlessSim" + " " + "seed"
+		 + " " + "area" + " " + "spApplied" + " " + "directionX");
+}
+
+// print Leaf data (includes petiole of leaf)
+public static void printLeavesDailyData(int trialNumber, PrintWriter LeavesFileDailyData,
+int doy, long seed)
+[
+	{
+		int count = 0;
+	}
+
+	(* t:Trunk (-->)+ p:Petiole (-->)+ l:Leaf, 
+	(print5times5inner?Arrays.asList(6,7,8,11,12,13,16,17,18).contains(t[number]):true) *) ::>
+	//(* t:Trunk (-->)+ p:Petiole (-->)+ l:Leaf *) ::>
+	{		
+		count++;
+		String ID = l.getId();
+		LeavesFileDailyData.println(
+		ID + " " + t[number] + " " + location(t).x + " " + location(t).y + 
+		" " + l.rowNumber + " " + count + " " + l[rankOnParentShoot] 
+		+ " " + l[rankOnCane] +
+		" " + l[rank] + " " + l[order] + " " + l[dayOfDevelopment] + " " + l[scale]  
+		+ " " + p[length]  + " " + l.x + " " + l.y + " " 
+		+ l.z + " " + doy + " " + THT(weatherData, 10, doy, budBurst) 
+		+ " " + trialNumber + " " + processNumber + " " + seed + " " + l[area] + " " + countBend
+		+ " " + direction(l).x);
+		LeavesFileDailyData.flush();   
+	}	
+]
+
+public static void createFileForLeavesMinuteData() {
+		String fileName1 = //sdf.format(timestamp)
+		"Leaves_Minute_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + "_" +
+		numberOfRows + "_" + plantsPerRow + ".csv"; //makeTimestamp
+		LeavesFileMinuteData = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+
+		// header
+		LeavesFileMinuteData.println(
+		"id" + " " + "dayOfYear" + " " + "time" + " " + "hour" + " " + "minute"
+		 + " " + "specX" + " " + "specY" + " " + "specZ" + 		 
+		 " " + "temperature" + " " + "humidity" + " " + "isLongwave" + " " + "skyOrGround"
+		 + " " + "inputLWSky_Wm2" + " " + "inputLWGround_Wm2" + " " + "inputDirectSR_Wm2" + " " + "inputDiffuseSR_Wm2");
+}
+
+public static void printLeavesMinuteData(PrintWriter LeavesFileMinuteData,
+int doy, String time, float hourOfDay, float minutes, long seed, boolean isLongwave, String skyOrGround,
+float inputLRSky, float inputLRGround, float inputDirectSR, float inputDiffuseSR, float humidityOfminute)
+[
+	{
+		int count = 0;
+	}
+
+	(* t:Trunk (-->)+ p:Petiole (-->)+ l:Leaf, 
+	(print5times5inner?Arrays.asList(6,7,8,11,12,13,16,17,18).contains(t[number]):true) *) ::>
+	{		
+		count++;
+		String ID = l.getId();
+		LeavesFileMinuteData.println(
+		
+		ID + " " + doy + " " + time + " " + hourOfDay + " " + minutes + " " + l[sx] + " " + l[sy]
+		+ " " + l[sz] + " " + tempOfMinute + " " + humidityOfminute + " " + isLongwave + " " + skyOrGround
+		 + " " + inputLRSky + " " + inputLRGround + " " + inputDirectSR + " " + inputDiffuseSR);
+		LeavesFileMinuteData.flush();   
+	}	
+]
+
+
+public static void createFileForBerriesDailyData() {
+		String fileName1 = //sdf.format(timestamp)
+		"Berries_Daily_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + "_" +
+		numberOfRows + "_" + plantsPerRow + ".csv"; //makeTimestamp
+		BerriesFileDailyData = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		BerriesFileDailyData.println(
+		"id" + " " + "plant" + " " + "plant.x" + " " + "plant.y" + 
+		" " + "rowNumber"  + " " + "berry"+ " " + "rankOnParentShoot"  + " " +
+		"shootOnCane" + " " + "rank" + " " + "order" + " " +  
+		"clusterNumber" + " " + "x" + " " + "y" + " " + "z" + 
+		" " + "dayOfYear" + " " + "simulation" + " " + "seed"
+		+ " " + "radius" + " " + "area" + " " + "SPsApplied");
+}
+
+public static void printBerriesDailyData(int trialNumber, PrintWriter BerriesFileDailyData,
+int dayOfYear, long seed)
+[
+	{
+		int count = 0;
+	}
+
+	(* t:Trunk (-->)+ o:Berry, 
+	(print5times5inner?Arrays.asList(6,7,8,11,12,13,16,17,18).contains(t[number]):true) *) ::>
+	{		
+		count++;
+		//String ID = o.getId();
+		BerriesFileDailyData.println(
+		o[in_id_berry] + " " + t[number] + " " + location(t).x + " " + location(t).y + 
+		" " + o.rowNumber + " " + count + " " + o[rankOnParentShoot] 
+		+ " " + o[rankOnCane] +
+		" " + o[rank] + " " + o[order] + " " + o[clusterNumber]  
+		 + " " + o.x + " " + o.y + " " + o.z + " " + dayOfYear
+		 + " " + processNumber + " " + seed + " " + o[radius]
+		 + " " + o[area]+ " " + countBend); //
+		BerriesFileDailyData.flush();   
+	}	
+]
+
+public static void createFileForBerriesMinuteData() {
+		String fileName1 = //sdf.format(timestamp)
+		"Berries_Minute_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + "_" +
+		numberOfRows + "_" + plantsPerRow + ".csv"; //makeTimestamp
+		BerriesFileMinuteData = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		BerriesFileMinuteData.println(
+		"id" + " " + "dayOfYear" + " " + "time" + " " + "hour" + " " + "minute"
+		 + " " + "specX" + " " + "specY" + " " + "specZ" + 
+		 " " + "temperature" + " " + "humidity" + " " + "isLongwave" + " " + "skyOrGround"
+		 + " " + "inputLWSky_Wm2" + " " + "inputLWGround_Wm2" + " " + "inputDirectSR_Wm2" + " " + "inputDiffuseSR_Wm2");
+}
+
+public static void printBerriesMinuteData(PrintWriter BerriesFileMinuteData,
+int doy, String time, float hourOfDay, float minutes, long seed, boolean isLongwave, String skyOrGround,
+float inputLRSky, float inputLRGround, float inputDirectSR, float inputDiffuseSR, float humidityOfminute)
+[
+	{
+		int count = 0;
+	}
+
+	(* t:Trunk (-->)+ o:Berry, 
+	(print5times5inner?Arrays.asList(6,7,8,11,12,13,16,17,18).contains(t[number]):true) *) ::>
+	{		
+		count++;
+		//String ID = o.getId();
+		BerriesFileMinuteData.println(
+		o[in_id_berry] + " " + doy + " " + time + " " + hourOfDay + " " + minutes + " " + o[sx] + " " + o[sy]
+		+ " " + o[sz] + " " + tempOfMinute + " " + humidityOfminute + " " + isLongwave + " " + skyOrGround
+		 + " " + inputLRSky + " " + inputLRGround + " " + inputDirectSR + " " + inputDiffuseSR);
+		BerriesFileMinuteData.flush();  
+		
+	}	
+]
+
+
+public static void printRowSensors(int trialNumber, PrintWriter RowSensorsFile,
+int doy, long seed)
+[
+	{
+		int count = 0;
+	}
+
+	ts:ITile ::>
+	{		
+		//count++;
+		//String ID = ts.getId();
+		RowSensorsFile.println(
+	/*	ID + " " + count + location(ts).x + " " + location(ts).y + " " 
+		+ location(ts).z + " " + doy + " " + trialNumber + " " + processNumber 
+		+ " " + seed + " " + ts[sx] + " " + ts[sy]	+ " " + ts[sz] + " " 
+		+ countBend);
+		*/
+		doy + " " + trialNumber + " " + processNumber 
+		+ " " + seed + " " + ts[sx] + " " + ts[sy]	+ " " + ts[sz] + " " + 
+		ts[abs_fullSpec_m2] + " " + countBend + " " + ts[idNumber]);
+		RowSensorsFile.flush();   
+	}	
+]
+
+public static void printmiddleSquareSensor(PrintWriter middleSquareSensorFile,
+int doy)
+[
+
+	ts:ITile ::>
+	{		
+		middleSquareSensorFile.println(
+		doy + " " + ts[sx] + " " + ts[sy]	+ " " + ts[sz] + " " + ts[abs_fullSpec_m2]);
+		middleSquareSensorFile.flush();   
+	}	
+]
+
+public static void printmiddleSquareSensorMinute(PrintWriter middleSquareSensorFile,
+int doy, String time, boolean isLongwave, float temp, String skyOrGround,
+float totalLongwaveSky, float totalLongwaveGround)
+[
+
+	ts:ITile ::>
+	{		
+		middleSquareSensorFile.println(
+		doy + " " + time + " " + ts[sx] + " " + ts[sy]	+ " " + ts[sz] + " " + ts[abs_fullSpec_m2] + " " + isLongwave
+		 + " " + temp + " " + skyOrGround + " " + totalLongwaveSky + " " + totalLongwaveGround);
+		middleSquareSensorFile.flush();   
+	}
+	
+	ts:diskSensor ::>
+	{		
+		middleSquareSensorFile.println(
+		doy + " " + time + " " + ts[sx] + " " + ts[sy]	+ " " + ts[sz] + " " + ts[abs_fullSpec_m2] + " " + isLongwave
+		 + " " + temp + " " + skyOrGround + " " + totalLongwaveSky + " " + totalLongwaveGround);
+		middleSquareSensorFile.flush();   
+	}		
+]
+
+public static void printmiddleSquareSensorHourly(PrintWriter middleSquareSensorFile,
+int doy, float hourOfDay)
+[
+
+	ts:ITile ::>
+	{		
+		middleSquareSensorFile.println(
+		doy + " " + hourOfDay + " " + ts[sx] + " " + ts[sy]	+ " " + ts[sz] + " " + ts[abs_fullSpec_m2]);
+		middleSquareSensorFile.flush();   
+	}	
+]
+
+public static void printSphereSensor(PrintWriter middleSquareSensorFile,
+int doy)
+[
+
+	ts:LightSensor ::>
+	{		
+		// !!! yet no extra file created, using the old file
+		middleSquareSensorFile.println(
+		doy + " " + ts[abs_fullSpec_m2]);
+		middleSquareSensorFile.flush();   
+	}	
+]
+
+static PrintWriter CardinalPointSensorsFile;
+
+public static void printCardinalPointSensors(PrintWriter CardinalPointSensorsFile,
+int doy)
+[
+
+	ts:ITile ::>
+	{		
+		CardinalPointSensorsFile.println(
+		doy + " " + ts[sx] + " " + ts[sy]	+ " " + ts[sz] + " " + ts[abs_fullSpec_m2] + " " + ts[id]);
+		CardinalPointSensorsFile.flush();   
+	}	
+]
+
+static PrintWriter IncomingLightFile;
+
+public static void printIncomingLight(int n, int doy, float dayLength, float[][] betaAzimSdr) {
+	
+	for(int a = 0; a<n; a++) {		
+		IncomingLightFile.println(
+		doy + " " + dayLength + " " + betaAzimSdr[0][a] + " " + betaAzimSdr[1][a] + " " 
+		+ betaAzimSdr[2][a] + " " + betaAzimSdr[2][n] + " " + betaAzimSdr[2][n+1]);
+		IncomingLightFile.flush(); 
+		//SensorsFile.close(); 
+	}
+}
+
+// create methods for files with header
+
+//static PrintWriter OrganDailyDataFile;
+static PrintWriter LeavesFile; // for daily mode
+static PrintWriter LeavesFileDailyData; // for minute mode
+static PrintWriter LeavesFileMinuteData; // for minute mode
+static PrintWriter InternodesFile;
+static PrintWriter BerriesFile;
+static PrintWriter BerriesFileDailyData;
+static PrintWriter BerriesFileMinuteData;
+static PrintWriter RowSensorsFile;
+static PrintWriter middleSquareSensorFile;
+static SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HH_mm_ss");
+
+
+public static void createFileForLeaves() {
+		String fileName1 = //sdf.format(timestamp)
+		"Leaves_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + "_" +
+		numberOfRows + "_" + plantsPerRow + ".csv"; //makeTimestamp
+		LeavesFile = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		LeavesFile.println(
+		"ID" + " " + "Plant" + " " + "Plant.x" + " " + "Plant.y" + 
+		" " + "rowNumber"  + " " + "Leaf"+ " " + "RankParentShoot"  + " " +
+		"ShootOnCane" + " " + "Rank" + " " + "Order" + " " + "Burst" + " " + 
+		"Scale" + " " + "petLength"  + " " + "x" + " " + "y" + " " + "z" + 
+		" " + "DOYPrint" + " " + "Time" + " " + "Hour" + " " + "Minute"  + " " + "THTSum" + " " + "GUISim" + " " + "HeadlessSim" + " " + "Seed"
+		 + " " + "specX" + " " + "specY" + " " + "specZ"
+		 + " " + "area" + " " + "absFullSpec_Ws" + " " + "absFullSpec_Wm2"
+		 + " " + "SPsApplied" + " " + "lightAboveStand" + " " + "directionX" + " " + "AirTemp" + " " + "isLongwave");
+}
+
+public static void createFileForInternodes() {
+		String fileName2 = //sdf.format(timestamp)
+		"Internodes_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + "_" 
+		+ numberOfRows + "_" + plantsPerRow	+ ".csv";
+		InternodesFile = new PrintWriter(new FileWriter(
+		outputPath + fileName2)); // ./
+		
+		// header
+		InternodesFile.println(
+		"ID" + " " + "Plant" + " " + "Plant.x" + " " + "Plant.y" + 
+		" " + "rowNumber"  + " " + "Internode" + " " + 
+		"RankParentShoot" + " " + "ShootOnCane" + " " + "Rank"+ " " + "Order"	+ 
+		" " + "Burst" + " " + "Length" + " " + "x" + " " + "y" + " " + "z" + 
+		" " + "DOYPrint"  + " " + "THTSum" + " " + "GUISim" + " " + "HeadlessSim" + " " + "Seed"
+		+ " " + "SPsApplied");
+}
+
+public static void createFileForBerries() {
+		String fileName1 = //sdf.format(timestamp)
+		"Berries_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + "_" +
+		numberOfRows + "_" + plantsPerRow + ".csv"; //makeTimestamp
+		BerriesFile = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		BerriesFile.println(
+		"ID" + " " + "Plant" + " " + "Plant.x" + " " + "Plant.y" + 
+		" " + "rowNumber"  + " " + "Berry"+ " " + "RankParentShoot"  + " " +
+		"ShootOnCane" + " " + "Rank" + " " + "Order" + " " + "Burst" + " " + 
+		"clusterNumber" + " " + 
+		"x" + " " + "y" + " " + "z" + 
+		" " + "DOYPrint" + " " + "Time" + " " + "Hour" + " " + "Minute" + " " + "AirTemp"  + " " + "THTSum" + " " + "GUISim" + " " + "HeadlessSim" + " " + "Seed"
+		 + " " + "specX" + " " + "specY" + " " + "specZ"
+		 + " " + "radius" + " " + "absFullSpec_Ws" + " " + "absFullSpec_Wm2"
+		 + " " + "surfaceTemperature" + " " + "storageFactor"
+		 + " " + "SPsApplied" + " " + "lightAboveStand" + " " + "directionX" + " " + "isLongwave");
+}
+
+public static void createFileForRowSensors() {
+		String fileName1 = //sdf.format(timestamp)
+		"RowSensors_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + ".csv"; //makeTimestamp
+		RowSensorsFile = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		RowSensorsFile.println(
+		"DOYPrint"  + " " + "GUISim" + " " + "HeadlessSim" + " " + "Seed"
+		 + " " + "specX" + " " + "specY" + " " + "specZ" + " " + "absFullSpec_Wm2" +
+		 " " + "#SPsApplied" + " " + "positionHeight");
+	
+}
+
+public static void createFileFormiddleSquareSensor() {
+		String fileName1 = //sdf.format(timestamp)
+		"middleSquareSensor_" + sdf.format(makeTimestamp()) + "_" + year + ".csv"; //makeTimestamp
+		middleSquareSensorFile = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		middleSquareSensorFile.println(
+		"DOYPrint"  + " " + "specX" + " " + "specY" + " " + "specZ" + " " + "absFullSpec_Wm2");
+}
+
+public static void createFileFormiddleSquareSensorIntervalMode() {
+		String fileName1 = //sdf.format(timestamp)
+		"middleSquareSensor_" + sdf.format(makeTimestamp()) + "_" + year + ".csv"; //makeTimestamp
+		middleSquareSensorFile = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		middleSquareSensorFile.println(
+		"DOYPrint"  + " " + "time"  + " " + "specX" + " " + "specY" + " " + "specZ" + " " + "absFullSpec_Wm2" + " " + "isLongwave"
+		 + " " + "temp" + " " + "skyOrGround" + " " + "totLWSky_Wm2" + " " + "totLWGround_Wm2");
+}
+
+
+public static void createFileForCardinalPointSensors() {
+		String fileName1 = //sdf.format(timestamp)
+		"CardinalPointSensors_" + sdf.format(makeTimestamp()) + "_" + year + ".csv"; //makeTimestamp
+		CardinalPointSensorsFile = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		CardinalPointSensorsFile.println(
+		"DOYPrint"  + " " + "specX" + " " + "specY" + " " + "specZ" + " " + "absFullSpec_Wm2" + " " + "id");
+}
+
+public static void createFileForIncomingLight() {
+		String fileName1 = //sdf.format(timestamp)
+		"IncomingLight_" + processNumber + "_" + sdf.format(makeTimestamp()) + "_" + year + ".csv"; //makeTimestamp
+		IncomingLightFile = new PrintWriter(new FileWriter(
+		outputPath + fileName1)); // ./
+		
+		// header
+		IncomingLightFile.println(
+		"DOYPrint"  + " " + "dayLength"  + " " + "beta" + " " + "azimuth" + " " + "directRadiation"
+		 + " " + "dailyTotal" + " " + "dailyDiffuse");
+	
+}
+
+
+
+
+const int MAX_IMG_WIDTH = 1920;
+const int MAX_IMG_HEIGHT = 1080;
+
+int step = 0;
+
+public static void renderImages()
+{
+	// make a new random seed
+	int randomID = (int)(10000*Math.random());
+		
+	ViewConfig3D v = View3D.getDefaultViewConfig(workbench());
+	Raytracer r = new Raytracer(workbench(), v, MAX_IMG_WIDTH, MAX_IMG_HEIGHT);
+	r.setRandomSeed(randomID);
+	//IMP.writeImage(r.computeImage(), new File(PATH+"DefaultView"+step+"_"+randomID+".png"));
+	IMP.writeImage(r.computeImage(), new File(outputPath+"test.png"));
+	Runtime runtime = Runtime.getRuntime();
+	println("render1:  memory = " + ((runtime.totalMemory()-runtime.freeMemory()) / 1000));
+	System.gc();
+	/*	
+	v = View3D.withCamera(v,
+		(Camera)
+		((de.grogra.pf.registry.ObjectItem)
+		 workbench().getRegistry()
+		 .getItem("/project/objects/3d/cameras/BirdView"))
+		.getObject());
+	r = new Raytracer(workbench(), v, MAX_IMG_WIDTH, MAX_IMG_HEIGHT);
+	r.setRandomSeed(randomID);
+	IMP.writeImage(r.computeImage(), new File(PATH+"BirdView"+step+"_"+randomID+".png"));
+	//IMP.writeImage(r.computeImage(), new File(PATH+"BirdView"+step+".png"));
+	runtime = Runtime.getRuntime();
+	println("render2: memory = " + ((runtime.totalMemory()-runtime.freeMemory()) / 1000));
+	*/
+}
+
+/*
+public static void makeImage() {
+	//makeSnapshot(PATH+"headlessTest.png");
+	renderImages();
+}*/    
+
+
+public static Timestamp makeTimestamp () { //Timestamp
+	Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+	return(timestamp); //.format(now)
+}
+
+/*
+public static Timestamp makeTimestamp () { //Timestamp //SimpleDateFormat
+	Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+	SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HH_mm_ss");
+	return(sdf.format(timestamp)); //.format(now)
+}*/
+
+
+
+
+// init data and parameters
+
+public static void loadWeatherData(int year) {
+	weatherData = readTxt(inputPath+weatherFile);
+}
+
+public static void loadMinuteWeatherData(int year) {
+	minuteWeatherData = readTxt(inputPath+minuteWeatherFile);
+	
+}
+
+public static void loadClusterBerryLocations(int plantNumber, int rankOnCane, int clusterRank) {
+	// cluster number as input variable, loop in phytomer
+	//println(inputPath+clusterFile+plantNumber+"_"+rankOnCane+"_"+clusterRank+".csv");
+	//println("Folder number in load method: " + clusterFolderNumber);
+	
+	try{
+		clusterBerryLocations = readTxt(inputPath+ "Folder_" + clusterFolderNumber + "/" + plantNumber+"_"+rankOnCane+"_"+clusterRank+".csv");
+		clusterBerryLocations_exists = clusterBerryLocations.getClass();
+	}
+	catch(Exception e) {
+		clusterBerryLocations_exists = null;
+	}
+	/*
+	try{
+		String[][] clusterFolderCheckFile = readTxt(inputPath+ "Folder_" + clusterFolderNumber + "/" + "folder_" + clusterFolderNumber + "_exists.csv");
+		clusterFolder_exists = clusterFolderCheckFile.getClass();
+	}
+	catch(Exception e) {
+		clusterFolder_exists = null;
+	}
+	*/
+	//if(clusterBerryLocations_exists == null) {
+		//println("YES");
+	//}
+	//println("exists?: " + clusterBerryLocations_exists);
+	//clusterBerryLocations = readTxt(inputPath+clusterFile+plantNumber+"_"+rankOnCane+"_"+clusterRank+".csv");
+}
+
+public static void loadParameters()
+{		
+		//weatherData = readTxt(weatherPath+weatherFile);
+		String[][] parametersText = readTxt(inputPath+parametersFile);
+		for(int r = 0; r < parametersText.length; r++){
+			pars.add(Float.valueOf(parametersText[r][3]));
+		}
+}
+
+
+public static void writeOutArray (String filename, float[]x) {
+  BufferedWriter outputWriter = null;
+  outputWriter = new BufferedWriter(new FileWriter(filename));
+  for (int i = 0; i < x.length; i++) {
+    // Maybe:
+    outputWriter.write(x[i]+"");
+    // Or:
+    outputWriter.write(Float.toString(x[i]));
+    outputWriter.newLine();
+  }
+  outputWriter.flush();  
+  outputWriter.close();  
+}
+
+
+public static float getTemp2m (String[][] minuteWeatherData, int doy, int hour, int minute) {
+	for(int r=0; r<minuteWeatherData.length; r++) {
+		if(Integer.parseInt(minuteWeatherData[r][7]) == doy &&
+		Integer.parseInt(minuteWeatherData[r][5]) == hour && 
+		Integer.parseInt(minuteWeatherData[r][6]) == minute) {
+			//println("T_minute: " + minuteWeatherData[r][1]);
+			return(Float.parseFloat(minuteWeatherData[r][1]));
+			break;
+		}
+	}
+}
+
+public static float getTemp5cm (String[][] minuteWeatherData, int doy, int hour, int minute) {
+	for(int r=0; r<minuteWeatherData.length; r++) {
+		if(Integer.parseInt(minuteWeatherData[r][7]) == doy &&
+		Integer.parseInt(minuteWeatherData[r][5]) == hour && 
+		Integer.parseInt(minuteWeatherData[r][6]) == minute) {
+			//println("T_minute: " + minuteWeatherData[r][1]);
+			return(Float.parseFloat(minuteWeatherData[r][2]));
+			break;
+		}
+	}
+}
+
+public static float getHumidity2m (String[][] minuteWeatherData, int doy, int hour, int minute) {
+	for(int r=0; r<minuteWeatherData.length; r++) {
+		if(Integer.parseInt(minuteWeatherData[r][7]) == doy &&
+		Integer.parseInt(minuteWeatherData[r][5]) == hour && 
+		Integer.parseInt(minuteWeatherData[r][6]) == minute) {
+			//println("T_minute: " + minuteWeatherData[r][1]);
+			return(Float.parseFloat(minuteWeatherData[r][3]));
+			break;
+		}
+	}
+}
+public static float getTempSoil5cm (String[][] minuteWeatherData, int doy, int hour, int minute) {
+	for(int r=0; r<minuteWeatherData.length; r++) {
+		if(Integer.parseInt(minuteWeatherData[r][7]) == doy &&
+		Integer.parseInt(minuteWeatherData[r][5]) == hour && 
+		Integer.parseInt(minuteWeatherData[r][6]) == minute) {
+			//println("T_minute: " + minuteWeatherData[r][1]);
+			return(Float.parseFloat(minuteWeatherData[r][9]));
+			break;
+		}
+	}
+}
+

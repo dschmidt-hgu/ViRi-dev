@@ -1,0 +1,123 @@
+
+import static main_Develop.*;
+import static Light.*;
+import static Functions.*;
+import static Globals.*;
+//import static Methods.*;
+import static methods_plant.*;
+
+//import de.grogra.ray.physics.Spectrum;
+import de.grogra.ray.physics.Spectrum3d;
+
+module compass(float length)
+==> 
+[RL(90) F(length).(setShader(RED)) 
+	[RU(-135) F(0.5).(setShader(RED))]
+	[RU(+135) F(0.5).(setShader(RED))]
+	M(0.2) TextLabel("N").(setColor(new Color3f(1,0,0)))
+]
+[RL(-90) F(length).(setShader(BLACK)) 
+	[RU(-135) F(0.5).(setShader(BLACK))]
+	[RU(+135) F(0.5).(setShader(BLACK))]
+	M(0.2) TextLabel("S").(setColor(new Color3f(0,0,0)))
+]
+[
+	RU(-90) F(length).(setShader(BLACK)) 
+	[RL(-135) F(0.5).(setShader(BLACK))]
+	[RL(+135) F(0.5).(setShader(BLACK))]
+	M(0.2) TextLabel("O").(setColor(new Color3f(0,0,0)))
+]
+[
+	RU(90) F(length).(setShader(BLACK)) 
+	[RL(-135) F(0.5).(setShader(BLACK))]
+	[RL(+135) F(0.5).(setShader(BLACK))]
+	M(0.2) TextLabel("W").(setColor(new Color3f(0,0,0)))
+]
+;
+
+module globalXAxis(int length)
+==> 
+RU(90)
+F(length).(setShader(RED)) 
+[RL(-135) F(0.5).(setShader(RED))]
+[RL(+135) F(0.5).(setShader(RED))]
+M(0.2) TextLabel("X")
+;
+
+module globalYAxis(int length)
+==> 
+RL(-90)
+F(length).(setShader(BLUE)) 
+[RU(-135) F(0.5).(setShader(BLUE))]
+[RU(+135) F(0.5).(setShader(BLUE))]
+M(0.2) TextLabel("Y")
+;
+
+module globalZAxis(int length)
+==> 
+F(length).(setShader(GREEN)) 
+[RL(-135) F(0.5).(setShader(GREEN))]
+[RL(+135) F(0.5).(setShader(GREEN))]
+M(0.2) TextLabel("Z")
+;
+
+//// scene modules
+module Post(super.length, super.diameter) extends F(length, diameter)
+{{ setShader(transOn?new RGBAShader(0, 0, 0, 0):new RGBAShader(0.5, 0.3, 0)); }}
+
+module TrunkWire(super.length, super.diameter, int rowNumber) extends F(length, diameter)
+{{setShader(transOn?new RGBAShader(0, 0, 0, 0):GRAY);}}
+
+module Wire(super.length, super.diameter) extends F(length, diameter)
+{{setShader(transOn?new RGBAShader(0, 0, 0, 0):GRAY);}}
+
+const Phong FullTransparencyShader			= new Phong().(setDiffuse(new RGBColor(0,0,0)), setDiffuseTransparency(new RGBColor(1,1,1)));
+
+
+// to be improved when dealing with multiple season growth
+module Trunk(super.length, super.diameter, int number) 
+extends F(length, diameter) 
+{{setShader(transOn?new RGBAShader(0, 0, 0, 0):new RGBAShader(0.6, 0.3, 0)); }}
+
+
+//{{setShader(tShader); }}
+
+// to be improved when dealing with multiple season growth
+module CaneSegment(super.length, super.diameter, 
+int order, int rank, int burst, int posCane) //, int posCane
+extends F(length, diameter) 
+{{setShader(transOn?new RGBAShader(0, 0, 0, 0):new RGBAShader(0, 0.5, 0, 1)); }}
+
+
+const Phong GroundShader			= new Phong().(setDiffuse(new RGBColor(0.1801,0.3998,0.0)), setDiffuseTransparency(new RGBColor(0.0,0.0,0.0)));
+
+module Ground 
+{
+	double length;
+	double width;
+	double area;
+	
+	void setGeometry(float v_length, float v_width) {
+	length = v_length;
+	width = v_width;
+	area = v_length*v_width;
+	}
+}
+==> //RL(-90) Translate(0.5*width,0,0) 
+RL(90) M(-length/2) RL(90) M(0.1) RL(-90)
+//Parallelogram(length,width).(setLayer(12), setShader(BLACK))//new AlgorithmSwitchShader(new RGBAShader(sRFR?rfr-0.2:fabs,sRFR?rfr-0.2:fabs,0),new RGBAShader(sRFR?rfr-0.2:fabs,sRFR?rfr-0.2:fabs,0),BLACK)))
+Parallelogram(length,width).(setShader(new AlgorithmSwitchShader(new RGBAShader(0.2,0.0,0.0), new RGBAShader(0.2,0.0,0.0), GroundShader)))
+;//FullTransparencyShader
+
+
+const Phong FullAbsorbanceShader			= new Phong().(setDiffuse(new RGBColor(0,0,0)), setDiffuseTransparency(new RGBColor(0,0,0)));
+
+// Potted
+
+module Plank( super.length, super.width, super.height) extends Box(length, width, height)
+{{ setShader(transOn?new RGBAShader(0, 0, 0, 0):new RGBAShader(0.5, 0.3, 0)); }}
+//{{ setShader(FullAbsorbanceShader);}}
+module Foil( super.length, super.width, super.height) extends Box(length, width, height)
+{{ setShader(transOn?new RGBAShader(0, 0, 0, 0):new RGBAShader(0.5, 0.3, 0)); }}
+//{{ setShader(FullAbsorbanceShader);}}
+

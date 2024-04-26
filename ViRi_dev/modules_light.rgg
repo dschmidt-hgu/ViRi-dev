@@ -1,0 +1,343 @@
+
+
+/*
+Light model computes daily radiation for n sun angles. Hence, one can get sun 
+angle and power for every n step.
+Question remains if daily course should be adjusted to meet full hour course
+*/
+
+import static main_Develop.*;
+import static Light.*;
+import static Functions.*;
+import static Globals.*;
+import static input_output.*;
+//import static Methods.*;
+import static methods_plant.*;
+
+//import de.grogra.ray.physics.Spectrum;
+import de.grogra.ray.physics.Spectrum3d;
+
+
+static boolean sRFR				= false;		// toggle PAR or R:FR visualisation (default value for swColor() method)
+
+
+
+// Light model modules
+
+// light source module
+// WHITE light == sun light
+module SingleLight(double power) extends LightNode().(setLayer(15), setLight(new DirectionalLight().(setPowerDensity(power), setVisualize(seeRays), getColor().set(new RGBColor(1,1,1))))) //setNumberofrays(10), setRaylength(20), 
+
+//==> Sphere(0.1)
+;
+
+// direct light source
+module DirectLightOfSun
+{
+	float mod; //??
+	float[] power = new float[n]; // Radiation intensity for every node
+	float[] beta = new float[n]; // Solar elevation angle
+	float[] azimuth = new float[n]; // Solar azimuth angle
+	double dist;					// distance of the light sources from the center of the scene
+	
+	void initiate(double d) {
+		dist = Math.max(10,d);
+		//println("Dist: " + dist);
+	}
+	
+	void updatePositionAndPowerHourly(int interval) {
+		//println("solarData[0][hour]: "+solarData[0][hour]);		
+		//println("n: "+n);
+		beta[interval] = solarData[0][interval];
+		//println("beta: "+beta[interval]);		
+		azimuth[interval] = solarData[1][interval];
+		//power[interval] = 1e6 * 0.55 * 4.55 * solarData[2][interval] / 
+		power[interval] = 1e6 * solarData[2][interval] / 
+		solarData[6][interval];
+
+		// direct light has to be corrected by angle here to see real life value
+		// original value will be processed by the light model accounting for angles
+		println("DirectSRPower " + 1e6 * ((Math.sin(solarData[0][interval]*ToRadians) * solarData[2][interval])) / solarData[6][interval]);
+	}
+	
+	void setHourlySunPosition(int interval) {
+		[
+			==> ^ RH(rowOrientation) AdjustLU RL(90) RU(90*mod)
+				[RU(azimuth[interval]) RL(-beta[interval]) M(dist) RL(180) SingleLight(power[interval])
+				//M(0.25) TextLabel(realHour).(setColor(new Color3f(1,0,0)))	
+				M(0.25) TextLabel(time + ":  " + (Math.round(power[interval]*100))/100.0).(setColor(new Color3f(0,0,0)))
+				];	
+				{derive();}
+		]
+	}
+	
+	void updatePositionAndPowerDaily() {		
+		for (int j=0; j <= n-1; j++) {			
+			beta[j] = betaAzimSdr[0][j];
+			azimuth[j] = betaAzimSdr[1][j];
+			//		into J/m², photos. active radiation 		per daylightDuration
+			power[j] = (1e6 * betaAzimSdr[2][j] / (dayLength*60*60))  //* fractionPAR
+			// / Math.sin(beta[j])
+			;
+			//println("Power: " + power[j]);
+		}			
+	}
+	
+	void setDailySunArc() 
+		[
+			==> ^ RH(rowOrientation) AdjustLU RL(90) RU(90*mod)
+			[
+				for (int j=0; j <= n-1; j++) (
+				[RU(azimuth[j]) RL(-beta[j]) M(dist) 
+				RL(180) SingleLight(power[j])
+				M(0.25) TextLabel(power[j]).(setColor(new Color3f(0,0,0)))
+				]
+				)			
+			];
+			{derive();}
+		]
+
+} 
+
+
+// diffuse light source
+module DiffuseLightOfSky
+{
+	float power;
+	double dist;					// distance of the light sources from the center of the scene
+	void initiate(double d) {
+		dist = Math.max(10,d);
+	}
+	void updatePowerHourly(int interval) {
+		//power = 1e6 * 0.55 * 4.55 * solarData[3][interval]
+		power = 1e6 * solarData[3][interval] 
+		/ solarData[6][interval]; // /n
+
+		// this is the real life value, power is processed accounting for angles later in dome for light model
+		println("DiffuseSRPower: " + power);
+		println(" ");
+
+	}
+	void updatePowerDaily() {
+		power = 1e6 * DailyDiffuseRadiation / (dayLength*60*60);	 // 4.55 * 
+	}
+	void setSolarRadiationSkyDome() {
+		[
+			==> ^ 
+				[
+				RH(random(0,360))
+				RL(90)
+				[ for (int i = 1; i<=12; i++) ([ RU(i*360/12) RL(-11.7) M(dist) RL(180) SingleLight(power*0.003218/Math.sin(11.7*Math.PI/180.0))] )]						// FIX old 0.205
+				[ for (int i = 1; i<=12; i++) ([ RU(20) RU(i*360/12) RL(-34.2) M(dist) RL(180) SingleLight(power*0.01163/Math.sin(34.2*Math.PI/180.0))] )]				    // FIX old 0.563
+				[ for (int i = 1; i<=12; i++) ([ RU(40) RU(i*360/12) RL(-54.9) M(dist) RL(180) SingleLight(power*0.019812/Math.sin(54.9*Math.PI/180.0))] )]				// FIX old 0.817
+				[ for (int i = 1; i<=12; i++) ([ RU(60) RU(i*360/12) RL(-71.1) M(dist) RL(180) SingleLight(power*0.023022/Math.sin(71.1*Math.PI/180.0))] )]				// FIX old 0.945
+				[ for (int i = 1; i<=12; i++) ([ RU(80) RU(i*360/12) RL(-82.8) M(dist) RL(180) SingleLight(power*0.018522/Math.sin(82.8*Math.PI/180.0))] )]				// FIX old 0.991
+				//[ for (int i = 1; i<=12; i++) ([ RU(80) RU(i*360/12) RL(-89.1) M(dist) RL(180) SingleLight(power*0.007096/0.998)])]               	// 0.998 
+				[ for (int i = 1; i<=12; i++) ([ RU(100) RU(i*360/12) RL(-89.1) M(dist) RL(180) SingleLight(power*0.007096/Math.sin(89.1*Math.PI/180.0))])]  	// FIX old 0.998   // MOD different Rotation 
+				// 0.998
+				];	
+				{derive();}
+		]
+	}
+}
+
+module DiffuseLongwaveLightOfSky
+{
+	float power;
+	double dist;					// distance of the light sources from the center of the scene
+	void initiate(double d) {
+		dist = Math.max(10,d);
+	}
+	void updateLongwavePowerHourly(int doy, int hour, int minute) {
+		power = getAmbientLongwaveFlux(getTemp2m(minuteWeatherData, doy, hour, minute), getHumidity2m(minuteWeatherData, doy, hour, minute)); // W/m²  // 329; //
+		//println("Sky Emissivity: " + getSkyEmissivity(getTemp2m(minuteWeatherData, doy, hour, minute), getHumidity2m(minuteWeatherData, doy, hour, minute)));
+	}
+	void setLongwaveSkyDome() {
+		[
+			==> ^ 
+			
+				[
+				RH(random(0,360))
+				RL(90)
+				
+				[ for (int i = 1; i<=12; i++) ([ RU(i*360/12) RL(-11.7) M(dist) RL(180) SingleLight(power/72.0)] )]						// FIX old 0.205
+				[ for (int i = 1; i<=12; i++) ([ RU(20) RU(i*360/12) RL(-34.2) M(dist) RL(180) SingleLight(power/72.0)] )]				    // FIX old 0.563
+				[ for (int i = 1; i<=12; i++) ([ RU(40) RU(i*360/12) RL(-54.9) M(dist) RL(180) SingleLight(power/72.0)] )]				// FIX old 0.817
+				[ for (int i = 1; i<=12; i++) ([ RU(60) RU(i*360/12) RL(-71.1) M(dist) RL(180) SingleLight(power/72.0)] )]				// FIX old 0.945
+				[ for (int i = 1; i<=12; i++) ([ RU(80) RU(i*360/12) RL(-82.8) M(dist) RL(180) SingleLight(power/72.0)] )]				// FIX old 0.991
+				//[ for (int i = 1; i<=12; i++) ([ RU(80) RU(i*360/12) RL(-89.1) M(dist) RL(180) SingleLight(power*0.007096/0.998)])]               	// 0.998 
+				[ for (int i = 1; i<=12; i++) ([ RU(100) RU(i*360/12) RL(-89.1) M(dist) RL(180) SingleLight(power/72.0)])]  	// FIX old 0.998   // MOD different Rotation 
+				// 0.998
+				];	
+				{derive();}
+
+				
+		]
+	}
+}
+
+// diffuse longwave light source
+module DiffuseLongwaveLightOfGround
+{
+	float power;
+	double dist;					// distance of the light sources from the center of the scene
+	void initiate(double d) {
+		dist = Math.max(10,d);
+	}
+	void updateLongwavePowerHourly(int doy, int hour, int minute) {
+		power = getGroundLongwaveFlux(getTempSoil5cm(minuteWeatherData, doy, hour, minute), eps); // 417; //  
+		
+		//417; // W/m²
+		//getAmbientLongwaveFlux()
+	}
+	void setGroundDome() {
+		[
+			==> ^
+			
+				[
+				RH(random(0,360))
+				RL(90)
+				RL(180)
+				[ for (int i = 1; i<=12; i++) ([ RU(i*360/12) RL(-11.7) M(dist) RL(180) SingleLight(power/72.0)] )]						// FIX old 0.205
+				[ for (int i = 1; i<=12; i++) ([ RU(20) RU(i*360/12) RL(-34.2) M(dist) RL(180) SingleLight(power/72.0)] )]				    // FIX old 0.563
+				[ for (int i = 1; i<=12; i++) ([ RU(40) RU(i*360/12) RL(-54.9) M(dist) RL(180) SingleLight(power/72.0)] )]				// FIX old 0.817
+				[ for (int i = 1; i<=12; i++) ([ RU(60) RU(i*360/12) RL(-71.1) M(dist) RL(180) SingleLight(power/72.0)] )]				// FIX old 0.945
+				[ for (int i = 1; i<=12; i++) ([ RU(80) RU(i*360/12) RL(-82.8) M(dist) RL(180) SingleLight(power/72.0)] )]				// FIX old 0.991
+				//[ for (int i = 1; i<=12; i++) ([ RU(80) RU(i*360/12) RL(-89.1) M(dist) RL(180) SingleLight(power*0.007096/0.998)])]               	// 0.998 
+				[ for (int i = 1; i<=12; i++) ([ RU(100) RU(i*360/12) RL(-89.1) M(dist) RL(180) SingleLight(power/72.0)])]  	// FIX old 0.998   // MOD different Rotation 
+				// 0.998
+				];	
+				{derive();}
+		]
+	}
+}
+
+
+
+
+      
+// light sensor Evers
+
+module LightSensor(float p_radius) extends SensorNode().(setRadius(p_radius), setTwoSided(false), setLayer(15)) { //15
+	double abs_fullSpec;			// absorbed full spectrum radiation (W/m²) 
+	double abs_PAR;					// (W/m²)
+	double abs_NIR; 				// (W/m²)
+	double abs_fullSpec_m2;			// (W/m²)
+	double abs_PAR_m2;					// absorbed radiation per unit area (W/m²)
+	double area;
+
+	int nr;
+	int x;
+	int y;
+	Spectrum3d spec;
+	
+	// initiation of the sensor
+	void initiate(int j, int x, int y) {
+		nr = j;
+		this.x = x;
+		this.y = y;
+	}	
+	
+	// calculate light perception
+	void calcLight() {
+		//Spectrum3d spec; // CHRIS: moved this to top
+		
+		spec = lm.getSensedIrradiance3d(this);
+		abs_fullSpec = cm * spec.z; // no reflectance or transmittance
+		abs_PAR = cm * spec.x * fractionPAR;
+		abs_NIR = cm * spec.y * fractionNIR;
+		abs_fullSpec_m2 = abs_fullSpec/area;
+		abs_PAR_m2 = abs_PAR/area;
+
+	}
+}
+==> Sphere(p_radius).(setLayer(15), setShader(FullAbsShader)); //12
+
+
+
+// general tile sensor
+module TileSensor
+{
+	double length;
+	double width;
+	double area;
+	double abs_fullSpec;			// absorbed full spectrum radiation (W/m²)
+	double abs_PAR;					// (W/m²)
+	double abs_NIR; 				// (W/m²)
+	double abs_fullSpec_m2;			// (W/m²)
+	double abs_PAR_m2;					// absorbed radiation per unit area (W/m²)
+	double sx;
+	double sy;
+	double sz;
+
+	// calculate light absorption
+ 	void calcLight()
+	{
+		if (area > 0) {
+			Spectrum3d spec;
+
+			spec = lm.getAbsorbedPower3d(this);
+			sx = spec.x;
+			sy = spec.y;
+			sz = spec.z;		
+			abs_fullSpec = cm * spec.z; // no reflectance or transmittance
+			abs_PAR = cm * spec.x * fractionPAR;
+			abs_NIR = cm * spec.y * fractionNIR;
+			abs_fullSpec_m2 = abs_fullSpec/area;
+			abs_PAR_m2 = abs_PAR/area;
+		}
+	}
+}
+
+
+//const Phong FullTransparencyShader			= new Phong().(setDiffuse(new RGBColor(0,0,0)), setDiffuseTransparency(new RGBColor(1,1,1)));
+const Phong FullAbsShader			= new Phong().(setDiffuse(new RGBColor(0.0,0.0,0.0)), setDiffuseTransparency(new RGBColor(0.0,0.0,0.0)));
+const Phong BerryLightShaderForSensor			= new Phong().(setDiffuse(new RGBColor(berryReflectancePAR,berryReflectanceNIR,0)), setDiffuseTransparency(new RGBColor(berryTransmittancePAR,berryTransmittanceNIR,0)));
+
+
+// plant-independent tile sensor
+module ITile extends TileSensor
+{
+	int rowNumber;
+	int x;
+	int y;
+	float idNumber;
+	String id;
+	void initiate(int row) { //int j, int x, int y
+		rowNumber = row;
+		//this.x = x;
+		//this.y = y;
+		length = 0.1;
+		width = 0.1;
+		area = 1;//length*width; // Math.PI*Math.sqrt(1/Math.PI)**2;//
+	}
+	void setGeometry(float v_length, float v_width) {
+		length = v_length;
+		width = v_width;
+		area = 1;//v_length*v_width; // Math.PI*Math.sqrt(1/Math.PI)**2;//
+	}
+	void setStringID(String str_id) {
+		id = str_id;
+	}
+	void setIdNumber(float nb_id) {
+		idNumber = nb_id;
+	}
+		
+}
+==> F(0.0001,Math.sqrt(1/Math.PI)).(setShader(BerryLightShaderForSensor));
+
+;//FullTransparencyShader
+
+
+
+module diskSensor(float radius) extends TileSensor {
+	float area;
+	
+	void getArea() {
+		area = Math.PI*this.radius**2;
+	}
+	
+}
+==> F(0.0001,radius).(setShader(new AlgorithmSwitchShader(new RGBAShader(0,0.8,0), new RGBAShader(0,0.8,0), BerryLightShaderForSensor)));
+;     
+      

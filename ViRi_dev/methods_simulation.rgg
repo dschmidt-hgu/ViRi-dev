@@ -1,0 +1,911 @@
+
+import static main_Develop.*; // read year and file
+import static input_output.*;
+import static Globals.*; // use methods in Riesling
+import static Light.*;
+import static methods_plant.*;
+import static methods_management.*;
+import static Functions.*;
+import static modules_scene.*;
+import static modules_plant.*;
+import static modules_light.*;
+
+//import de.grogra.pf.boot.Main;	// for startup-headless-read pars
+import de.grogra.imp3d.DisplayVisitor;
+import de.grogra.graph.GraphState;
+import de.grogra.graph.Path;
+import de.grogra.pf.io.PropertyFileReader;
+import de.grogra.imp3d.ViewConfig3D;
+import de.grogra.imp3d.View3D;
+import de.grogra.imp3d.ray2.Raytracer;
+import java.io.File;
+import de.grogra.imp.IMP;
+
+import de.grogra.gpuflux.scene.experiment.Measurement;
+
+// scene initiation
+public static void initScene ()
+[
+	{
+		clearConsole();
+
+		if(fixedSeed == false){ // !=fixedSeed
+			seed = (long) random(0,1000000); 
+			//println("Seed: " + seed);
+		}
+		else{
+			seed = 123164;//219007;//595419;
+			//println("Seed: " + seed);
+		}
+		if(fixedSeedLightModel == false){ // !=fixedSeed
+			seedLightModel = (int) random(0,1000000); 
+			//println("Seed: " + seed);
+		}
+		else{
+			seedLightModel = 123164;//219007;//595419;
+			//println("Seed: " + seed);
+		}
+		
+		setSeed(seed);
+		lm.setRandomseed(seedLightModel);
+		//filesExist = false;
+		loadWeatherData(year);
+		loadParameters();
+		dayOfYear = 1;//budBurst -15;//(int) pars[0] - 15;
+		if(dayOfYearSetManually) {
+			dayOfYear = startAtThisDayOfYear;
+		}
+		// for Henke light model
+		//hourOfDay = 0;
+		avHeight = 0;
+		countBend = 0;
+		numberOfPlants = numberOfRows * plantsPerRow;
+		int plantNumber = 0;
+		isPruned == false;
+		
+		if(readSettings) {
+			readSettingsFromFile();
+		}
+		// think it through if necesseary here after testing
+		// not enough info here: where is it used? How?
+		InitiateAvoidMechanism(numberOfRays, openWidthAngle, openHightAngle, predictedLength);
+		println("Number of light rays: " + num_light_rays);
+	}
+	
+	Axiom ==>  
+	
+	if(compass)(
+		[RH(rowOrientation) Translate(0,0,-1) compass(1.5)]
+	)
+
+	if(light) (		
+		[df:DiffuseLightOfSky]
+		[dr:DirectLightOfSun]
+		if(longwaveOn) (
+			[dfLLSKY:DiffuseLongwaveLightOfSky]
+			[dfLLGROUND:DiffuseLongwaveLightOfGround]
+			{
+				dfLLSKY.initiate(10);
+				dfLLGROUND.initiate(10);
+			}
+		)
+		
+		    
+		{
+			//createFileForIncomingLight();
+			//computeLightPowerAndSunAngles(); // init with 0 as NA
+			df.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			//df.setSkyDome();
+			dr.initiate(10); // d is not the distance!!! distance computed in light.rgg
+			//dr.setDailySunArc(); // here not working, also not necessary, first day simulation initiates arc
+
+		}
+
+	)
+	
+	for(int row = 0; row < numberOfRows; row++)(
+	[		
+		RH(180)
+		//Translate(RowDistance[row], 0, 0)
+		Translate((rowSpacing * row) - ((rowSpacing * numberOfRows) / 2) + (rowSpacing/2), 0, 0)	
+		//Translate(0, (4.5 * row) - ((4.5 * Rows) / 2) + 2.75, 0)	// rowSpacing = row distance
+	/*	[M(plantSpacing) // height
+		RL(-90) 
+		for(int i = 1; i<=9; i++) ( // i = (distance/numberOfSensores) + 1
+		ITile.(initiate()) M(0.5)	// M = (distance/numberOfSensores)	//Sphere(0.02)
+		)
+		]
+		//ITile
+	*/
+		// posts (direction along y-axis)
+		for(int p = 0; p < numberOfRowSegments+1; p++)(
+			//[Translate(0, 4.5 -(4.5 * p), 0) Post(lengthPost, widthPost)]
+			[
+				Translate(0, (distPost*numberOfRowSegments)/2, 0) 
+				Translate(0, (-distPost*(p)), 0) Post(lengthPost, widthPost)
+			]
+		)
+		
+		 // lower wire (cane)
+		[Translate(0, (distPost*numberOfRowSegments)/2, 0) M(WireHeights[0]) RL(90) TrunkWire(distPost * (numberOfRowSegments), 0.01, row)]
+		// main stem with 12 ranks
+		
+		for(int p = 0; p < plantsPerRow; p++)(
+			//{plantNumber++;}		
+		[		
+			
+			//Translate(0, rowSpacing - plantSpacing * (p+1), 0) 
+			Translate(0, (distPost*numberOfRowSegments)/2+(plantSpacing-0.1) - plantSpacing * (p+1), 0)
+			tr:Trunk(WireHeights[0], 0.06, plantNumber)
+			RL(90) 
+			{ 
+				float CaneInitialAngleProbability = random(0.0,100.0);
+			}
+			if(CaneInitialAngleProbability >= 50.0) (
+				RH(random(170, 190))			
+			)
+			else (
+				RH(random(-10,10))
+			)	
+			
+			for(int r = 1; r <= 10; r++)(		
+				RL(random(0.5, -0.5)) CaneSegment(
+				// 1000 just a very high THT sum to achieve max growth
+				primIntGrowth(1000, r), 0.02, 0, r, 0, r).(setShader(
+				transOn?new RGBAShader(0, 0, 0, 0):new RGBAShader(0.6, 0.3, 0))) 
+				//new RGBAShader(0,0,0,0)))
+		
+				if(r != 2 && r != 4)(	//	
+					[M( -primIntGrowth(1000, r) / 10)
+					RL(-90) M(0.01) RL(90) 
+					RL(-45) // exactly as axillary buds on primary shoots
+					{ 
+						float ApexInitialAngleProbability = random(0.0,100.0);
+					}
+					if(ApexInitialAngleProbability > 50.0) (
+						RH(random(170, 190))			
+					)
+					else (
+						RH(random(-10,10))
+					)	 
+					// Model starts development here!
+					wb:WinterBud.(initiate(0 + 1, 0, BudBurst(budBurst, weatherData, 10), r, row, tr.number)) //, random(0.0,1.0)>=0.7058824?3:4)
+					]
+				) 
+				
+				RH(random(170, 190))		
+			)
+		]     
+		{plantNumber++;}		
+		)
+	]
+	);
+]
+
+
+public static void simulateDay(int trialNumber)
+{
+
+	// daily aspects
+	//##########################################################################
+	//ai.setPrepareScene();
+	develop();
+	grow();
+	System.gc();
+	println("Doy: " + dayOfYear);
+	//println("Test: " + test);
+	
+	// apply bend and count events
+	countBend = ApplyBend(countBend);	
+	updateGlobalLocation();
+	if(stopCriterium != "runUntilMaxHeight" && meanHeightOfPrimaryShoots() > maxHeight) {
+		println("meanHeightOfPrimaryShoots(): " + meanHeightOfPrimaryShoots());
+		cutAtHeight(cutAtHeight_m);
+		isPruned = true;
+	}
+	// since some main shoots were not cut in lines before, this workaround assures no infinite main shoot growth
+	if(isPruned) {
+		cutAtHeight(cutAtHeight_m);
+	}
+
+		
+	System.gc();
+
+	
+	
+	if(defoliateOnSide == "left") {
+		applyDefoliateVerticalZoneLeftSideOfCanePointingSouth(defoliateDay, defoliateAbove, defoliateBelow);
+	}
+	if(defoliateOnSide == "right") {
+		applyDefoliateVerticalZoneRightSideOfCanePointingSouth(defoliateDay, defoliateAbove, defoliateBelow);
+	}
+
+	// daily mode currently still below after minute loop
+	if(numberOfPlants > 0 && hourlyModeOn){
+		// print organ daily data
+		printInt(trialNumber, InternodesFile, dayOfYear, seed);
+		printLeavesDailyData(trialNumber, LeavesFileDailyData, dayOfYear, seed);
+		printBerriesDailyData(trialNumber, BerriesFileDailyData, dayOfYear, seed);
+	}
+	
+	if(rendIm && dayOfYear >= startImagesOnDay){
+		makeImage();//makeRenderedImageFlux(outputPath + "renderedScene_" + year + "_" + dayOfYear + ".png", 1920, 1080);
+	}
+	
+
+	
+	if(light && dayOfYear >= startLightAtThisDayOfYear) {
+		if(hourlyModeOn) {
+			
+			/*if(dayOfYear==130 || dayOfYear==120) {
+				System.gc();
+			}*/
+			// function knows if hourly or daily
+			computeLightPowerAndSunAngles(); // (returns the array with last hour on position 0)
+			try{
+				minuteWeatherDataFile_exists = minuteWeatherData.getClass();
+			}catch(Exception e) {
+				minuteWeatherDataFile_exists = null;
+			}
+			if(minuteWeatherDataFile_exists==null) {
+				loadMinuteWeatherData(year);
+			}
+
+			for(int interval = n-1; interval >= 0; interval--) {
+
+				hourOfDay = Math.floor(solarData[4][n-1 - interval]);
+				minutes = (solarData[4][n-1 - interval] - 
+				Math.floor(solarData[4][n-1 - interval])) * 60;
+				minutes = Math.round(minutes); //minutes = Math.round(minutes*10)/10.0;
+
+				if(minutes == 60) {
+					hourOfDay++;
+					minutes = 0;
+				}
+				
+				time = (int) Math.floor(solarData[4][n-1 - interval]) + ":" + (int) minutes;
+
+				/*
+				if(interval == 11) { // 10 = 12:58 on doy 203
+					println("Defoliate, time: " + time, 0xff0000);
+					if(defoliateOnSide == "left") {
+						applyDefoliateVerticalZoneLeftSideOfCanePointingSouth(defoliateDay, defoliateAbove, defoliateBelow);
+					}
+					if(defoliateOnSide == "right") {
+						applyDefoliateVerticalZoneRightSideOfCanePointingSouth(defoliateDay, defoliateAbove, defoliateBelow);
+					}
+				}
+				*/
+						
+				println("Time: " + time);
+				
+				try{
+					tempOfMinute = getTemp2m(minuteWeatherData, dayOfYear, (int) hourOfDay, (int) minutes);
+					humidityOfMinute = getHumidity2m(minuteWeatherData, dayOfYear, (int) hourOfDay, (int) minutes);
+					println("tempOfMinute: " + tempOfMinute);
+					println("doy: " + dayOfYear);
+					println("hour: " + (int) hourOfDay);
+					println("minutes: " + (int) minutes);
+				}catch(Exception e) {
+					println("Stopped! Probably minute data missing", 0xff0000);
+					break;
+				}
+				println("\n");
+				
+				if(setGroundIntoScene) {
+				[
+					==> ^ Ground.(setGeometry(30,30));
+				]
+				}
+
+				
+				updateOnMinuteSunAndDomePowerAndPosition(interval);	
+				//lm.setTargetVariance(0.00014,0.00007); //(0.0004,0.00000225);
+				lm.compute();	  
+				// TODO: leaf print with LR flag
+				leafAbsorb();
+			
+			
+				
+				if(berriesON) {
+					berryAbsorb();
+					// direct light has to be corrected by angle here to print real life value
+					//println("HERE dir: " + 1e6 * (solarData[2][interval]/solarData[6][interval]));
+					//println("HERE diff: " + 1e6 * (solarData[3][interval]) / solarData[6][interval]);
+					//println("HERE 157: " + 157.77470527826*Math.sin(solarData[0][interval]*ToRadians));
+					printBerriesMinuteData(BerriesFileMinuteData, dayOfYear, time, hourOfDay, minutes, seed, false, "sun", 0, 0, 1e6 * (solarData[2][interval]*Math.sin(solarData[0][interval]*ToRadians)) / 
+					solarData[6][interval], 1e6 * (solarData[3][interval]) / solarData[6][interval], humidityOfMinute); //hourOfDay
+				}
+				if(numberOfPlants > 0) {
+					printLeavesMinuteData(LeavesFileMinuteData, dayOfYear, time, hourOfDay, minutes, seed, false, "sun", 0, 0, 1e6 * (solarData[2][interval]*Math.sin(solarData[0][interval]*ToRadians)) / 
+					solarData[6][interval], 1e6 * (solarData[3][interval]) / solarData[6][interval], humidityOfMinute); //hourOfDay					); //hourOfDay					
+						
+				}
+
+				if(middleSquareSensorOn) {
+					println("Shortwave: ");
+					applymiddleSquareSensor("rectangular", middleSquareSensorHeight, 1, 1, false, tempOfMinute, "sun", 0, 0); //3.0 7.2, 4.5
+					//System.gc();	// needs lots of time
+				}
+				if(middleDiskSensorOn) {
+					println("Shortwave: ");
+					applymiddleSquareSensor("disk", middleDiskSensorHeight, 1, 1, false, tempOfMinute, "sun", 0, 0); //3.0 7.2, 4.5
+					//System.gc();	// needs lots of time
+				}
+				
+				
+				
+				// delete sun after light computation? default=yes, no only for visual checks
+				if(!showArc) {
+				[
+					// cannot delete DirectLightOfSun because it is not a scene object
+						(* dr:SingleLight *), dr ==>> ;	
+						(* df:SingleLight *), df ==>> ;
+				]
+				}
+				
+				
+				if(setGroundIntoScene) {
+				[
+					(* g:Ground *), g ==> ;
+				]
+				}
+				{derive();
+				System.gc();}
+
+				// 
+				// LONGWAVE
+				// 
+				
+				// toggle: true = longwave radiation
+							
+				if(longwaveOn) {	
+					
+					// sky:
+					try{
+						tempOfMinute = getTemp2m(minuteWeatherData, dayOfYear, (int) hourOfDay, (int) minutes);
+						humidityOfMinute = getHumidity2m(minuteWeatherData, dayOfYear, (int) hourOfDay, (int) minutes);
+						updateOnMinuteLongwaveSkyDomePowerAndPosition(dayOfYear, (int) hourOfDay, (int) minutes);
+						//lm.setTargetVariance(1000,0.05);
+						lm.compute(); //true,false
+						leafAbsorb();
+						if(numberOfPlants > 0) {
+							printLeavesMinuteData(LeavesFileMinuteData, dayOfYear, time, hourOfDay, minutes, seed, true, "sky", getAmbientLongwaveFlux(tempOfMinute, humidityOfMinute), 0, 0, 0, humidityOfMinute); //hourOfDay					); //hourOfDay					
+						}
+						if(berriesON) {
+							berryAbsorb();
+							printBerriesMinuteData(BerriesFileMinuteData, dayOfYear, time, hourOfDay, minutes, seed, true, "sky", getAmbientLongwaveFlux(tempOfMinute, humidityOfMinute), 0, 0, 0, humidityOfMinute); //hourOfDay
+						}
+						if(middleSquareSensorOn) {
+							println("Longwave Sky: ");
+							applymiddleSquareSensor("rectangular", middleSquareSensorHeight, 1, 1, true, tempOfMinute, "sky", getAmbientLongwaveFlux(tempOfMinute, humidityOfMinute), 0); //3.0 7.2, 4.5
+							//System.gc();	// needs lots of time
+						}
+						if(middleDiskSensorOn) {
+							println("Longwave Sky: ");
+							applymiddleSquareSensor("disk", middleDiskSensorHeight, 1, 1, true, tempOfMinute, "sky", getAmbientLongwaveFlux(tempOfMinute, humidityOfMinute), 0); //3.0 7.2, 4.5
+							
+						}
+							
+						if(!showArc) {
+						[	
+								// !! simply deletes all light sources, cannot distinguish solar, lr sky or gound sources
+								(* dfLLSKY:SingleLight *), dfLLSKY ==>> ;
+								//(* dfLLSKY:DiffuseLongwaveLightOfSky *), dfLLSKY ==>> ;
+								
+						]
+						}
+					} catch(Exception e){
+							println("Longwave not applied, did you forget to set loadWeatherData toggle (udate: toggle not active anymore)?!", 0xff0000);
+					}
+					{
+					derive();
+					System.gc();}
+					
+					// ground:
+					try{
+						tempOfMinute = getTempSoil5cm(minuteWeatherData, dayOfYear, (int) hourOfDay, (int) minutes);
+						updateOnMinuteLongwaveGroundDomePowerAndPosition(dayOfYear, (int) hourOfDay, (int) minutes);
+						//lm.setTargetVariance(1000,0.05);
+						lm.compute(); //true,false
+						leafAbsorb();
+						if(numberOfPlants > 0) {
+							printLeavesMinuteData(LeavesFileMinuteData, dayOfYear, time, hourOfDay, minutes, seed, true, "ground", 0, getGroundLongwaveFlux(tempOfMinute, eps), 0, 0, humidityOfMinute); //hourOfDay					); //hourOfDay					
+						}
+						if(berriesON) {
+							berryAbsorb();
+							printBerriesMinuteData(BerriesFileMinuteData, dayOfYear, time, hourOfDay, minutes, seed, true, "ground", 0, getGroundLongwaveFlux(tempOfMinute, eps), 0, 0, humidityOfMinute); //hourOfDay
+						}
+						if(middleSquareSensorOn) {
+							println("Longwave Ground: ");
+							applymiddleSquareSensor("rectangular", middleSquareSensorHeight, 1, 1, true, tempOfMinute, "ground", 0, getGroundLongwaveFlux(tempOfMinute, eps)); //3.0 7.2, 4.5
+							//System.gc();	// needs lots of time
+						}
+						if(middleDiskSensorOn) {
+							println("Longwave Ground: ");
+							applymiddleSquareSensor("disk", middleDiskSensorHeight, 1, 1, true, tempOfMinute, "ground", 0, getGroundLongwaveFlux(tempOfMinute, eps)); //3.0 7.2, 4.5
+							
+						}
+						
+						if(!showArc) {
+						[	
+							// !! simply deletes all light sources, cannot distinguish solar, lr sky or gound sources
+								(* dfLLGROUND:SingleLight *), dfLLGROUND ==>> ;	
+								//(* dfLLGROUND:DiffuseLongwaveLightOfGround *), dfLLGROUND ==>> ;
+						]
+						}
+					} catch(Exception e){
+							println("Longwave not applied, did you forget to set loadWeatherData toggle (udate: toggle not active anymore)?!", 0xff0000);
+					}
+				}
+
+			}
+
+		}
+		else {			
+			computeLightPowerAndSunAngles(); // array of angles and powers
+			updateDailySunAndDomePowerAndPosition();
+			lm.compute();
+			leafAbsorb();
+			// 20200208
+			if(berriesON) {
+				berryAbsorb();
+			}
+			
+			if(middleSquareSensorOn) {
+				applymiddleSquareSensor("rectangular", 0.0, 1, 1, false, 99, "sun", 0, 0); //3.0 7.2, 4.5
+				System.gc();	// needs lots of time
+			}
+			if(cardinalPointSensorsOn) {
+				applyCardinalPointSensors();
+				System.gc();
+			}	
+			if(rowSensorsOn) {
+				applyFourRowSensorLines(trialNumber, 2, 4);
+				System.gc();
+			}
+			// !!! Only ok for one day, after radiation wrong because of repeated lights 
+			if(!showArc) {
+			[
+				(* dr:SingleLight *), dr ==>> ;
+				(* dr:SingleLight *), dr ==>> ;
+			]
+			}			
+		}
+		System.gc();
+	}
+
+	// presentation mode 
+	if(presentation){
+		avHeight = meanHeightOfPrimaryShoots();
+		println("#primShoots: " + count((* i:Internode, (i[order] == 1 && i[rank] == 1) *)));
+		//clearConsole();
+		println("Mean height of primary shoots: " + 
+		Math.round(avHeight * 100.0) / 100.0 + "m");
+		println("DOY " + dayOfYear); // + 1 because doy relates to array
+		Thread.sleep(50); //250
+		println("#SPs: " + countBend);
+	}
+		if(rendIm && dayOfYear >= startImagesOnDay){
+		makeImage();//makeRenderedImageFlux(outputPath + "renderedScene_" + year + "_" + dayOfYear + ".png", 1920, 1080);
+	}
+	{
+		// could switch off if needed
+		if(numberOfPlants > 0) {
+			if(!hourlyModeOn) {
+		}
+	
+		}
+		if(rendVid && dayOfYear >= startVideoImagesOnDoy){
+			// ? still in use?
+			makeRenderedImage(outputPath + "renderedScene_" + year + "_" + dayOfYear + ".png", 1920, 1080);
+		}			
+	}	
+
+	dayOfYear++;
+	//System.gc();
+}
+
+
+// multiple simulations with automated data print (FOR GUI!!)
+public static void loopSimulation()	{
+	if(loop > 1 && fixedSeed == true) {
+		println("Loop stopped. Please turn off fixed seed!", 0xff0000);	
+	}
+	else {
+		clusterFolderNumber = 1;
+		if(numberOfPlants > 0) {
+			if(hourlyModeOn) {
+				createFileForLeavesDailyData();
+				createFileForLeavesMinuteData();
+			}else {
+				createFileForLeaves();
+			}
+			createFileForInternodes();
+			//createFileForOrganDailyData("Internodes", "length", "test2", "test3", "test4", "test5");
+
+		}
+		if(numberOfPlants > 0 && light  && berriesON) {
+			if(hourlyModeOn){
+				createFileForBerriesDailyData();
+				createFileForBerriesMinuteData();
+			}
+			//createFileForBerries();
+		}
+		if(light  && dayOfYear >= startLightAtThisDayOfYear && rowSensorsOn) {
+			createFileForRowSensors();
+		}
+		if(light  && dayOfYear >= startLightAtThisDayOfYear && middleSquareSensorOn) {
+			if(!hourlyModeOn) {
+				createFileFormiddleSquareSensor();
+			}
+			else {
+				createFileFormiddleSquareSensorIntervalMode();
+			}
+		}
+		if(light  && dayOfYear >= startLightAtThisDayOfYear && middleDiskSensorOn) {
+			if(!hourlyModeOn) {
+				createFileFormiddleSquareSensor();
+			}
+			else {
+				createFileFormiddleSquareSensorIntervalMode();
+			}
+		}
+		if(light  && dayOfYear >= startLightAtThisDayOfYear && cardinalPointSensorsOn) {
+			createFileForCardinalPointSensors();
+		}
+		for(int t = 1; t <= loop; t++){
+			try{
+				//reset();
+				initScene(); // if model run in GUI and with loop, this is applied twice at first loop because of init()
+				//processNumber = "0";
+				runUntilStopCriteriumReached(t, stopCriterium); //, LeavesFile, InternodesFile
+				println("Simulation # " + t);
+			} catch(Exception e){
+				println("Simulation crashed!", 0xff0000);			
+			} // define exception
+		}	
+		printSimulationStopInfo();
+		if(rendIm){
+			makeImage();//makeRenderedImageFlux(outputPath + "renderedScene_" + year + "_" + dayOfYear + ".png", 1920, 1080);
+		}	
+		if(numberOfPlants > 0) {
+			if(hourlyModeOn){
+				LeavesFileDailyData.close();
+				LeavesFileMinuteData.close();
+			}else{
+				LeavesFile.close();
+			}
+			InternodesFile.close();
+			//OrganDailyDataFile.close();
+		}
+		if(numberOfPlants > 0 && light && berriesON) {
+			if(hourlyModeOn){
+				BerriesFileDailyData.close();
+				BerriesFileMinuteData.close();
+			}else{
+				BerriesFile.close();
+			}
+		}
+		if(light  && dayOfYear >= startLightAtThisDayOfYear && rowSensorsOn) {
+			RowSensorsFile.close();
+		}
+		if(light  && dayOfYear >= startLightAtThisDayOfYear && middleSquareSensorOn) {
+			middleSquareSensorFile.close();		
+		}	
+		if(light  && dayOfYear >= startLightAtThisDayOfYear && middleDiskSensorOn) {
+			middleSquareSensorFile.close();		
+		}	
+		if(light  && dayOfYear >= startLightAtThisDayOfYear && cardinalPointSensorsOn) {
+			CardinalPointSensorsFile.close();		
+		}
+
+		System.gc();
+	}
+}
+
+// for headless mode
+public static void runAllDays(String simulationNumber) {
+	initScene();
+	//println("Cluster Folder used: " + clusterFolderNumber);
+	long startTime = System.nanoTime();			
+	if(numberOfPlants > 0) {
+		if(hourlyModeOn){
+			createFileForLeavesDailyData();
+			createFileForLeavesMinuteData();
+		}else {
+			createFileForLeaves();
+		}
+		createFileForInternodes();
+	}
+	if(numberOfPlants > 0 && light && berriesON) {
+		if(hourlyModeOn){
+			createFileForBerriesDailyData();
+			createFileForBerriesMinuteData();
+		}
+		//createFileForBerries();
+	}
+	if(light  && dayOfYear >= startLightAtThisDayOfYear && rowSensorsOn) {
+		createFileForRowSensors();
+	}
+	if(light  && dayOfYear >= startLightAtThisDayOfYear && middleSquareSensorOn) {
+		//createFileFormiddleSquareSensor();
+		if(!hourlyModeOn) {
+				createFileFormiddleSquareSensor();
+		}
+		else {
+				createFileFormiddleSquareSensorIntervalMode();
+		}
+	}
+	if(light  && dayOfYear >= startLightAtThisDayOfYear && middleDiskSensorOn) {
+		//createFileFormiddleSquareSensor();
+		if(!hourlyModeOn) {
+				createFileFormiddleSquareSensor();
+		}
+		else {
+				createFileFormiddleSquareSensorIntervalMode();
+		}
+	}
+	if(light  && dayOfYear >= startLightAtThisDayOfYear && cardinalPointSensorsOn) {
+		createFileForCardinalPointSensors();
+	}	
+	runUntilStopCriteriumReached(simulationNumber, stopCriterium);
+	printSimulationStopInfo();
+    long stopTime = System.nanoTime();
+	double seconds = (stopTime - startTime)/1000000000;
+	println("Normal time: " + seconds + "s, " + seconds/60 + "min");
+	println("Done");
+	if(rendIm){
+		makeImage();//makeRenderedImageFlux(outputPath + "renderedScene_" + year + "_" + dayOfYear + ".png", 1920, 1080);
+	}	
+	if(numberOfPlants > 0) {
+		if(hourlyModeOn){
+			LeavesFileDailyData.close();
+			LeavesFileMinuteData.close();
+		}else{
+			LeavesFile.close();
+		}
+		InternodesFile.close();
+	}
+	if(numberOfPlants > 0 && light && berriesON) {
+		if(hourlyModeOn){
+			BerriesFileDailyData.close();
+			BerriesFileMinuteData.close();
+		}else {
+			BerriesFile.close();
+		}
+	}
+	if(light  && dayOfYear >= startLightAtThisDayOfYear && rowSensorsOn) { // if light off, but sensors on, model should stop
+		RowSensorsFile.close();
+	}
+	if(light  && dayOfYear >= startLightAtThisDayOfYear && middleSquareSensorOn) {
+		middleSquareSensorFile.close();		
+	}
+	if(light  && dayOfYear >= startLightAtThisDayOfYear && middleDiskSensorOn) {
+		middleSquareSensorFile.close();		
+	}
+	if(light  && dayOfYear >= startLightAtThisDayOfYear && cardinalPointSensorsOn) {
+		CardinalPointSensorsFile.close();		
+	}	
+}
+
+
+protected static void runUntilStopCriteriumReached(String simulationNumber, String criterium)//, PrintWriter LeavesFile, PrintWriter InternodesFile)
+{	
+	int simNumber = Integer.parseInt(simulationNumber); 
+	
+	if(criterium == "runUntilMaxHeight") {	
+		float RelationHighShootsToAllShoots = 0;	
+		while(RelationHighShootsToAllShoots < desiredRelation && dayOfYear <= stopSimAtDoy) {  //366
+			simulateDay(simNumber);
+			RelationHighShootsToAllShoots = computeRelationHighShootsToAllShoots(RelationHighShootsToAllShoots);
+		}
+	}
+	if(criterium == "runUntilDoy") {	
+		float RelationHighShootsToAllShoots = 0;	
+		while(dayOfYear <= stopSimAtDoy) {  //366
+			simulateDay(simNumber);
+		}
+	}
+	
+}
+
+
+public static float computeRelationHighShootsToAllShoots(float RelationHighShootsToAllShoots) { //computeSPRelationHighEnoughShootsToAllShoots
+		long numberOfPrimaryShootsHigherMaximumHeight = count((* a:Apex, (a[order] == 1 && 
+		a.z > maxHeight) *));	
+		long numberOfAllPrimaryShoots = count((* i:Internode, (i[order] == 1 && 
+		i[rank] == 1) *));
+		if(numberOfAllPrimaryShoots > 0){	
+			RelationHighShootsToAllShoots = (float) numberOfPrimaryShootsHigherMaximumHeight/numberOfAllPrimaryShoots;
+		}
+		return(RelationHighShootsToAllShoots);
+}
+
+
+public static void printSimulationStopInfo() {
+	avHeight = meanHeightOfPrimaryShoots();
+	println("Mean height of primary shoots: " + 
+	Math.round(avHeight * 100.0) / 100.0 + "m");
+	println("DoyStopInfo: " + (dayOfYear-1)); // dayOfYear increased by one in simulateDay() but simulation stopped	
+	
+	println("Number of Rows: " + numberOfRows);	
+	println("Plants per Row: " + plantsPerRow);	
+	println("Total Number of Plants: " + numberOfPlants);
+	
+	if(fixedSeed) {
+			println("FIXED SEED!", 0xff0000);
+	}	
+	if(clusterFolder_exists==null) {
+		println("Cluster folder does not exist!", 0xff0000);
+	}
+}
+
+
+public static void updateGlobalLocation() {
+	TestVisitor v = new TestVisitor();
+	v.init(graphState());
+	graph().accept(null, v, null);
+}
+
+private class TestVisitor extends DisplayVisitor {
+	void init (GraphState gs)
+	{
+		Matrix4d m = new Matrix4d();
+		m.setIdentity();
+		init (gs, m, null, false);
+	}
+
+	@Override
+	protected void visitImpl (Object object, boolean asNode, Shader s, Path path)
+	{
+		if(object instanceof Internode) {
+			//println("Visited " + object);
+			((Internode)object).x = transformation.m03;
+			((Internode)object).y = transformation.m13;
+			((Internode)object).z = transformation.m23;
+		}
+		
+		if(object instanceof Apex) {
+			//println("Visited " + object);
+			((Apex)object).x = transformation.m03;
+			((Apex)object).y = transformation.m13;
+			((Apex)object).z = transformation.m23;
+		}
+		
+		if(object instanceof AxillaryBud) {
+			//println("Visited " + object);
+			((AxillaryBud)object).x = transformation.m03;
+			((AxillaryBud)object).y = transformation.m13;
+			((AxillaryBud)object).z = transformation.m23;
+		}		
+		
+		if(object instanceof Leaf) {
+			//println("Visited " + object);
+			((Leaf)object).x = transformation.m03;
+			((Leaf)object).y = transformation.m13;
+			((Leaf)object).z = transformation.m23;
+		}
+		
+		if(object instanceof Joint) {
+			//println("Visited " + object);
+			((Joint)object).x = transformation.m03;
+			((Joint)object).y = transformation.m13;
+			((Joint)object).z = transformation.m23;
+		}
+		
+		if(object instanceof Petiole) {
+			//println("Visited " + object);
+			((Petiole)object).x = transformation.m03;
+			((Petiole)object).y = transformation.m13;
+			((Petiole)object).z = transformation.m23;
+		}
+		if(object instanceof Berry) {
+			//println("Visited " + object);
+			((Berry)object).x = transformation.m03;
+			((Berry)object).y = transformation.m13;
+			((Berry)object).z = transformation.m23;
+		}
+		if(object instanceof FruitMeristem) {
+			//println("Visited " + object);
+			((FruitMeristem)object).x = transformation.m03;
+			((FruitMeristem)object).y = transformation.m13;
+			((FruitMeristem)object).z = transformation.m23;
+		}
+	}
+}
+
+/*
+protected void startup()
+{
+	super.startup();
+	
+		if (Main.getProperty("headless") != null)											// !
+	{
+		runLater(null);
+		//initScene();  no
+		//reset();		no
+	}
+}
+
+protected void run(Object info) 
+{
+	processNumber = Main.getArg(0); // parallel-run number
+	//test = Main.getArg(1);
+	//println(args[0]);
+	if(fixedSeed) {
+		println("Model stopped. Please turn off fixed seed!", 0xff0000);
+	}
+	else {
+		//reset();
+		if(readSettings) {
+			readSettingsFromFile();
+			
+			init();
+		}
+		runAllDays(processNumber);
+	}
+	//derive();
+	//makeImage();
+	//graph().dumpNodeStatistics(System.out);
+	System.gc();
+	System.exit(0);
+}*/
+
+// delete now and put into headless, but later find solution for shared codebase
+// issue: model would use settings from mains for simulation, not read values from file (although output filenames use read values)
+
+// select here the property / scenario you want to use
+private final static String SCENARIO_FILE_NAME = "scenario.txt";
+
+
+protected static boolean readSettingsFromFile() {
+	boolean error = false;
+	error = error || loadPropertyFile();
+//	error = error || loadClimateData();
+	if (error) println("Error during reading of parameter file(s)!");
+	return error;
+}
+// !!! path to be adjusted with R
+private static boolean loadPropertyFile() {
+	PropertyFileReader propertyFile = new PropertyFileReader("/home/chris/Documents/ViRi_Geisenheim/" + SCENARIO_FILE_NAME);
+ 
+	//iff there was an error during reading the property file
+	if(propertyFile.load()) return true;
+
+	loadProperties(propertyFile);
+	println("Parameter file successfully read. "+propertyFile.getNumberOfReadProperties()+" parameter read.");
+	println("numberOfRows: " + propertyFile.getInteger("numberOfRows"));
+	println("plantsPerRow: " + propertyFile.getInteger("plantsPerRow"));
+	
+	return false;
+}
+
+private static void loadProperties(PropertyFileReader propertyFile) {
+	numberOfRows = propertyFile.getInteger("numberOfRows");
+	plantsPerRow = propertyFile.getInteger("plantsPerRow");
+	numberOfRowSegments = propertyFile.getInteger("numberOfRowSegments");
+	//testPath = propertyFile.getString("testPath");
+}
+
+static void makeImage() {
+	//makeSnapshot(PATH+"headlessTest.png");
+	renderImages();
+	//makeRenderedImageFlux(PATH+"test.png");
+}
+
+private static void renderImages()
+{
+	// make a new random seed
+	int randomID = (int)(10000*Math.random());
+		
+	ViewConfig3D v = View3D.getDefaultViewConfig(workbench());
+	Raytracer r = new Raytracer(workbench(), v, 1920, 1080);
+	r.setRandomSeed(randomID);
+	//IMP.writeImage(r.computeImage(), new File(PATH+"DefaultView"+step+"_"+randomID+".png"));
+	IMP.writeImage(r.computeImage(), new File(outputPath + "renderedScene_" + year + "_" + dayOfYear + ".png"));
+	Runtime runtime = Runtime.getRuntime();
+	println("render1:  memory = " + ((runtime.totalMemory()-runtime.freeMemory()) / 1000));
+	System.gc();
+		
+}

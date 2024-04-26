@@ -1,0 +1,159 @@
+// TODO: maybe put import below settings if possible
+import java.util.*; //?
+//import java.util.Random;
+import java.io.FileWriter;                  
+import java.io.PrintWriter;
+
+import static modules_plant.*;
+import static modules_light.*;
+import static modules_scene.*;
+import static Functions.*;
+import static input_output.*;
+import static Globals.*; 
+import static Light.*;               
+import static methods_simulation.*;
+import static methods_management.*;
+import static methods_plant.*;
+
+//20220309
+import de.grogra.imp3d.View3D;
+import de.grogra.imp3d.ViewConfig3D;
+import de.grogra.ray.physics.Spectrum3d;
+
+import de.grogra.pf.boot.Main;	// for startup-headless-read pars
+//import java.nio.file;
+
+// Riesling growth starting on fixed trunk
+
+// ### IMPORTANT SETTINGS ###
+
+// settings
+// headless with external file settings?
+const boolean readSettings = false;//true;
+const int year = 2023;		//1940 	|1987 	| 1979 | 2014	| 2017	| 2018
+const int budBurst = 116;//111;	//122	|120	| 135  | 99		| 101	| 111
+const int LATITUDE = 50;//-34;//52;
+protected static int numberOfRows = 5;
+protected static int plantsPerRow = 5;//5; // 5 between two posts
+protected static float rowOrientation = -180+162;// 84;//-45;//84; // 90 = canes point west, 0 = pointng south
+// todo: if numberOfRowSegments == 0, still first post created
+protected static int numberOfRowSegments =  1;
+const boolean print5times5inner = false;
+const boolean berriesON = true;
+const int initBerriesOnDoy = 231;//230; //203
+//const boolean loadMinuteWeatherDataOn = true;
+const boolean hourlyModeOn = true; // TODO: rename into intervalMode
+// !!! only ok for one day, otherwise radiation values wrong bec.of repeated lights
+const boolean showArc = false;
+//const int hour = 12;
+const boolean dayOfYearSetManually = true; const int startAtThisDayOfYear = 80;// 230;//203;//235;//361;//130;
+const String stopCriterium = "runUntilDoy";// "runUntilDoy"; // "runUntilMaxHeight"
+const int stopSimAtDoy = 231;//230;//230;//202;//202;//203;//200;//200;
+const float maxHeight = 2.3;//2.3;//2.3;//3.0;//1.8;//2.3;//2.3;// 1.55;//2.3;// maybe maximalStandHeight or so
+const float cutAtHeight_m = 2.0;//2.3;
+
+// light on?
+const boolean light = true; const int startLightAtThisDayOfYear = 231;
+const boolean longwaveOn = true;
+const boolean middleSquareSensorOn = false; const float middleSquareSensorHeight = 0.00;
+const boolean middleDiskSensorOn = false; const float middleDiskSensorHeight = 0.00;
+const boolean cardinalPointSensorsOn = false;
+const boolean rowSensorsOn = false; const int startDayRowSensors = 130;//157;
+// > 1 not working anymore since reset() and loop method out of main
+const int loop = 1; // number of simulations with automated data print
+const boolean compass = true;
+const boolean setGroundIntoScene = false;
+
+
+ // cane pointing south, then left == east, right == west
+const int defoliateDay = 231; const String defoliateOnSide = "right";  //231;
+const double defoliateAbove = 0.0;
+const double defoliateBelow = 1.3;
+
+
+// stop simulation: > 90%
+const float desiredRelation = 0.5; // % of main shoots min at maxHeight
+
+
+// make rendered image?
+const boolean rendIm = false;
+const int startImagesOnDay = 232;//153;
+// make rendered images for video? option seems no to be in use
+const boolean rendVid = false; const int startVideoImagesOnDoy = 163;
+// if using "run" or "Run run": set true to slow down the simulation for 
+// better illustration
+const boolean presentation =  false;//true;//
+// fixed seed?
+const boolean fixedSeed = false;//false;//false;
+// fixed seed light model?
+const boolean fixedSeedLightModel = false;
+// transparent objects and organs?
+const boolean transOn = false;//
+// set path for read and print files
+
+// ### END IMPORTANT SETTINGS ###
+
+
+// only for GUI model run
+// ATTENTION!: if read from scenario file, init() must be inactive here and 
+// 			   active in headless run()
+
+protected void init() {
+	initScene();
+}
+
+protected void startup()
+{
+	super.startup();
+	
+		if (Main.getProperty("headless") != null)											// !
+	{
+		runLater(null);
+		//initScene();  no
+		//reset();		no
+	}
+}
+
+protected void run(Object info) 
+{
+	processNumber = Main.getArg(0); // parallel-run number
+	if(berriesON) {
+		clusterFolderNumber = Main.getArg(0);
+		//println("clusterFolderNumber: " + clusterFolderNumber);
+	}
+	
+	//test = Main.getArg(1);
+	//println(args[0]);
+	/*if(fixedSeed) {
+		println("Model stopped. Please turn off fixed seed!", 0xff0000);
+	}
+	else {*/
+		//reset();
+		if(readSettings) {
+			readSettingsFromFile();			
+			init(); // outside this restriction? I think this is reinit, if settings changed with read in file
+		}
+		runAllDays(processNumber);
+	//}
+	//derive();
+	//makeImage();
+	//graph().dumpNodeStatistics(System.out);
+	System.gc();
+	System.exit(0);
+}
+
+
+// buttons
+
+public void loopSim() {
+	disableView3DRepaint();
+	enableView3DRepaint();
+	long startTime = System.nanoTime();		
+	reset(); // works if button is clicked, but not with loop > 1	
+	loopSimulation();
+    long stopTime = System.nanoTime();
+	double seconds = (stopTime - startTime)/1000000000;
+	println("Normal time: " + seconds + "s, " + seconds/60 + "min");
+	println("Done");	
+}
+
